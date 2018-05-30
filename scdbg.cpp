@@ -19,7 +19,6 @@
 using spp::sparse_hash_map;
 
 
-
 #define PRED(r, state) BOOST_PP_NOT_EQUAL( \
     BOOST_PP_TUPLE_ELEM(2, 0, state) \
   , BOOST_PP_TUPLE_ELEM(2, 1, state) \
@@ -72,22 +71,23 @@ std::string parse_inputfile(const std::string &fname) {
 
         myfile.close();
         return line;
-    } else {
+    }
+    else {
         std::cerr << "Unable to open file '" << fname << "'" << std::endl;
         exit(1);
     }
 }
 
 
-#define MACRO(r, state) \
-    case BOOST_PP_TUPLE_ELEM(2, 0, state): { \
-        DeBrujinGraph<BOOST_PP_TUPLE_ELEM(2, 0, state) / MAXCOLOR, \
-                      (BOOST_PP_TUPLE_ELEM(2, 0, state) % MAXCOLOR)> dbg; \
-        std::string dna_str = "TAATGCCATGGGATGTT"; \
-        dbg.process_read(dna_str, 0); \
-        dbg.do_stats(); \
-        dbg.gen_succinct_dbg(); \
-        break; }
+// #define MACRO(r, state) \
+//     case BOOST_PP_TUPLE_ELEM(2, 0, state): { \
+//         DeBrujinGraph<BOOST_PP_TUPLE_ELEM(2, 0, state) / MAXCOLOR, \
+//                       (BOOST_PP_TUPLE_ELEM(2, 0, state) % MAXCOLOR)> dbg; \
+//         std::string dna_str = "TAATGCCATGGGATGTT"; \
+//         dbg.process_read(dna_str, 0); \
+//         dbg.do_stats(); \
+//         dbg.gen_succinct_dbg(); \
+//         break; }
 
 
 int main(int argc, char *argv[]) {
@@ -96,9 +96,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    const uint8_t KMER = 3;
-    const uint8_t COLORS = 1;
-
+    // const uint8_t KMER = 3;
+    // const uint8_t COLORS = 1;
     // switch (KMER * MAXCOLOR + COLORS) {
     //     BOOST_PP_FOR((ITERATIONSTART, ITERATIONSEND), PRED, OP, MACRO)
     //
@@ -111,7 +110,9 @@ int main(int argc, char *argv[]) {
     // process_read(dbg, dna_str, 0);
     // do_stats(dbg);
 
-    DeBrujinGraph<KMER, COLORS> dbg;
+    const uint8_t KMER = 3;
+    const uint8_t COLORS = 1;
+    DeBrujinGraph dbg(KMER);
     std::string dna_str1 = "TACGTCGACGACT";
     std::string dna_str2 = "TACGCGACT";
     // result:
@@ -120,32 +121,43 @@ int main(int argc, char *argv[]) {
     // 1110111100111111    <-- B_L
     dbg.process_read(dna_str1, 0);
     dbg.process_read(dna_str2, 1);
+    dbg.process_read(dna_str1, 0, false);
+    dbg.process_read(dna_str2, 1, false);
     dbg.do_stats();
     dbg.gen_succinct_dbg();
 
 
-
-    // DeBrujinGraph<KMER, COLORS> dbg;
-    // std::ifstream myfile(argv[1]);
-    // std::string fname;
-    // uint64_t color_id = 0;
-    // if (myfile.is_open()) {
-    //     while (getline(myfile, fname)) {
-    //         std::string dna_str = parse_inputfile(fname);
-    //         dbg.process_read(dna_str, color_id);
-    //         if (++color_id >= COLORS) {
-    //             break;
+    // const uint8_t KMER = 14;
+    // const uint8_t COLORS = 1;
+    // DeBrujinGraph dbg(KMER);
+    // for (int i = 0; i < 2; ++i) {
+    //     std::cerr << "Start phase " << i << std::endl;
+    //     std::ifstream myfile(argv[1]);
+    //     std::string fname;
+    //
+    //     uint64_t color_id = 0;
+    //     if (myfile.is_open()) {
+    //         while (getline(myfile, fname)) {
+    //             std::string dna_str = parse_inputfile(fname);
+    //             std::cout << dna_str.size() << std::endl;
+    //             dbg.process_read(dna_str, color_id, i == 0);
+    //             if (++color_id >= COLORS) {
+    //                 break;
+    //             }
+    //         }
+    //         myfile.close();
+    //
+    //         if (i != 0) {
+    //             dbg.do_stats();
+    //             // dbg.gen_succinct_dbg();
     //         }
     //     }
+    //     else {
+    //         std::cout << "Unable to open file '" << argv[1] << "'" << std::endl;
+    //         exit(1);
+    //     }
     //
-    //     myfile.close();
-    //
-    //     dbg.do_stats();
-    // } else {
-    //     std::cout << "Unable to open file '" << argv[1] << "'" << std::endl;
-    //     exit(1);
     // }
-
     return 0;
 }
  
