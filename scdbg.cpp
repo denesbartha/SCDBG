@@ -4,17 +4,17 @@
 #include <sparsepp/spp.h>
 #include <iostream>
 #include <fstream>
-
-#define MAXCOLOR        32
-#define ITERATIONSTART  65
-#define ITERATIONSEND   66  // 32 * 32
-
 #include <boost/preprocessor/tuple/elem.hpp>
 #include <boost/preprocessor/tuple/size.hpp>
 #include <boost/preprocessor/repetition/for.hpp>
 #include <boost/preprocessor/arithmetic/inc.hpp>
 #include <boost/preprocessor/comparison/not_equal.hpp>
+
 #include "dbg.hpp"
+
+#define MAXCOLOR        32
+#define ITERATIONSTART  65
+#define ITERATIONSEND   66  // 32 * 32
 
 using spp::sparse_hash_map;
 
@@ -110,54 +110,58 @@ int main(int argc, char *argv[]) {
     // process_read(dbg, dna_str, 0);
     // do_stats(dbg);
 
-    const uint8_t KMER = 3;
-    const uint8_t COLORS = 1;
-    DeBrujinGraph dbg(KMER);
-    std::string dna_str1 = "TACGTCGACGACT";
-    std::string dna_str2 = "TACGCGACT";
-    // result:
-    // TCCGTGGGACTAAA$C
-    //  001111110111111    <-- B_F
-    // 1110111100111111    <-- B_L
-    dbg.process_read(dna_str1, 0);
-    dbg.process_read(dna_str2, 1);
-    dbg.process_read(dna_str1, 0, false);
-    dbg.process_read(dna_str2, 1, false);
-    dbg.do_stats();
-    dbg.gen_succinct_dbg();
-
-
-    // const uint8_t KMER = 14;
+    // const uint8_t KMER = 3;
     // const uint8_t COLORS = 1;
-    // DeBrujinGraph dbg(KMER);
-    // for (int i = 0; i < 2; ++i) {
-    //     std::cerr << "Start phase " << i << std::endl;
-    //     std::ifstream myfile(argv[1]);
-    //     std::string fname;
-    //
-    //     uint64_t color_id = 0;
-    //     if (myfile.is_open()) {
-    //         while (getline(myfile, fname)) {
-    //             std::string dna_str = parse_inputfile(fname);
-    //             std::cout << dna_str.size() << std::endl;
-    //             dbg.process_read(dna_str, color_id, i == 0);
-    //             if (++color_id >= COLORS) {
-    //                 break;
-    //             }
-    //         }
-    //         myfile.close();
-    //
-    //         if (i != 0) {
-    //             dbg.do_stats();
-    //             // dbg.gen_succinct_dbg();
-    //         }
-    //     }
-    //     else {
-    //         std::cout << "Unable to open file '" << argv[1] << "'" << std::endl;
-    //         exit(1);
-    //     }
-    //
-    // }
+    // // DeBrujinGraph<uint128_t, std::map<uint128_t, size_t>, std::map<uint128_t, size_t>::iterator> dbg(KMER);
+    // DeBrujinGraph<> dbg(KMER);
+    // std::string dna_str1 = "TACGTCGACGACT";
+    // std::string dna_str2 = "TACGCGACT";
+    // // result:
+    // // TCCGTGGGACTAAA$C
+    // //  001111110111111    <-- B_F
+    // // 1110111100111111    <-- B_L
+    // dbg.process_read(dna_str1, 0);
+    // dbg.process_read(dna_str2, 1);
+    // dbg.process_read(dna_str1, 0, false);
+    // dbg.process_read(dna_str2, 1, false);
+    // dbg.do_stats();
+    // dbg.gen_succinct_dbg();
+
+
+    const uint8_t KMER = 16;
+    const uint8_t COLORS = 1;
+    // DeBrujinGraph<uint128_t, std::set<uint128_t>, std::vector<uint128_t>::iterator> dbg(KMER);
+    // DeBrujinGraph<uint128_t, std::map<uint128_t, size_t>, std::map<uint128_t, size_t>::iterator> dbg(KMER);
+    DeBrujinGraph<> dbg(KMER);
+    // DeBrujinGraph<> dbg(KMER);
+    for (int i = 0; i < 2; ++i) {
+        std::cerr << "Start phase " << i << std::endl;
+        std::ifstream myfile(argv[1]);
+        std::string fname;
+
+        uint64_t color_id = 0;
+        if (myfile.is_open()) {
+            while (getline(myfile, fname)) {
+                std::string dna_str = parse_inputfile(fname);
+                // std::cout << dna_str.size() << std::endl;
+                dbg.process_read(dna_str, color_id, i == 0);
+                if (++color_id >= COLORS) {
+                    break;
+                }
+            }
+            myfile.close();
+
+            if (i != 0) {
+                dbg.do_stats();
+                // dbg.gen_succinct_dbg();
+            }
+        }
+        else {
+            std::cout << "Unable to open file '" << argv[1] << "'" << std::endl;
+            exit(1);
+        }
+
+    }
     return 0;
 }
  

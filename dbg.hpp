@@ -11,11 +11,10 @@
 #include <roaring.hh>
 #include <stxxl/vector>
 #include <sparsepp/spp.h>
-// #include <sdsl/uint256_t.hpp>
 #include <sdsl/bit_vectors.hpp>
 #include <sdsl/wavelet_trees.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
-// using namespace boost::multiprecision;
+
+#include "bitset_wrapper.h"
 
 
 using spp::sparse_hash_map;
@@ -25,13 +24,6 @@ using spp::sparse_hash_map;
 
 //log_2(SIGMA + 1)
 #define LOGSIGMA    3
-
-// Node struct that contains nodes_outgoing and the outgoing edges (this is necessary for the building process...)
-// template<uint8_t COLORBITS>
-// struct Node {
-//     std::bitset<SIGMA + 1> out_edges;
-//     // std::bitset<COLORBITS> colors;
-// };
 
 
 static inline uint8_t symbol_to_bits(const char c) {
@@ -88,24 +80,25 @@ static inline uint8_t symbol_to_id(const char c) {
 }
 
 
-// template<uint8_t KMER, uint8_t COLORBITS, uint16_t KMERBITS = LOGSIGMA * KMER>
+template<typename T = uint64_t, typename BitSetClass = Roaring64Map,
+        typename Iterator_Type = Roaring64MapSetBitForwardIterator>
 class DeBrujinGraph {
 public:
 
-    DeBrujinGraph() : km(32), kmer_bits(64) {}
+    DeBrujinGraph() : DeBrujinGraph(32) {}
 
     DeBrujinGraph(const uint8_t pkm) : km(pkm), kmer_bits(LOGSIGMA * pkm) {}
 
     void process_read(const std::string &dna_str, const uint64_t color_id, bool phase_first = true) {
-        static uint8_t sid;
+        static T sid;
         std::cerr << "process " << color_id << "..." << std::endl;
         // read the first KMER-sized substring will be $$$..$
         // std::bitset<KMERBITS> akmer = 0;
         // boost::multiprecision::uint256_t akmer = 0;
-        uint64_t akmer = 0;
+        T akmer = 0;
 
         if (!phase_first && !second_phase_started) {
-            nodes_outgoing.resize(dbg_kmers.cardinality());
+            nodes_outgoing.resize(dbg_kmers.size());
             for (uint64_t i = 0; i < nodes_outgoing.size(); ++i) {
                 nodes_outgoing[i] = 0;
             }
@@ -115,9 +108,7 @@ public:
 
         // read the rest of the dna string...
         if (phase_first) {
-            if (km <= 32) {
-                dbg_kmers.add((uint64_t)akmer);
-            }
+            dbg_kmers.add(akmer);
         }
         else {
             add_new_node(akmer, color_id, true, false, 255);
@@ -141,7 +132,7 @@ public:
     void do_stats() {
         std::cout << "Creating statistics..." << std::endl;
 
-        uint64_t num_of_nodes = dbg_kmers.cardinality();
+        uint64_t num_of_nodes = dbg_kmers.size();
         uint64_t num_of_edges = 0;
         std::vector<uint64_t> in_degrees(SIGMA + 2, 0);
         std::vector<uint64_t> out_degrees(SIGMA + 2, 0);
@@ -156,7 +147,7 @@ public:
         // uint64_t colored_branches = 0;
         // sparse_hash_map<std::bitset<COLORBITS>, std::bitset<1> > colors;
 
-        std::cerr << dbg_kmers.cardinality() << std::endl;
+        std::cerr << dbg_kmers.size() << std::endl;
 
         for (const auto &item : dbg_kmers) {
             // std::bitset<kmer_bits> bb = item;
@@ -164,7 +155,7 @@ public:
 
             // uint64_t icnt = count_edges(item.second->in_edges);
             uint64_t icnt = count_incoming_edges(item);
-            uint64_t ocnt = count_outgoing_edges(nodes_outgoing[dbg_kmers.rank(item) - 1]);
+            uint64_t ocnt = count_outgoing_edges(nodes_outgoing[dbg_kmers.rank(item)]);
             in_degrees[icnt]++;
             out_degrees[ocnt]++;
 
@@ -172,7 +163,7 @@ public:
 
             // colors[item.second.colors] = 1;
 
-            print_node(item, icnt, ocnt);
+            // print_node(item, icnt, ocnt);
 
             if (icnt == 1 && ocnt == 1) {
                 in_out_one++;
@@ -250,9 +241,9 @@ public:
 
     void gen_succinct_dbg() {
         std::cerr << "Generating Succinct De Bruijn Graph..." << std::endl;
-        std::cerr << "Generating Edge list..." << std::endl;
+        std::cout << "Generating Edge list..." << std::endl;
         for (auto it : dbg_kmers) {
-            const auto &anode = nodes_outgoing[dbg_kmers.rank(it) - 1];
+            const auto &anode = nodes_outgoing[dbg_kmers.rank(it)];
             for (uint8_t i = 0; i < SIGMA + 1; ++i) {
                 if (anode[i]) {
                     std::cout << base[i];
@@ -261,9 +252,9 @@ public:
         }
         std::cout << std::endl;
 
-        std::cerr << "Generating B_F list..." << std::endl;
+        std::cout << "Generating B_F list..." << std::endl;
         for (auto it : dbg_kmers) {
-            // const auto &anode = nodes_ingoing[dbg_kmers.rank(it) - 1];
+            // const auto &anode = nodes_ingoing[dbg_kmers.rank(it)];
             int ic = count_incoming_edges(it);
             if (ic > 0) {
                 std::cout << std::string(ic - 1, '0') << "1";
@@ -273,16 +264,16 @@ public:
             }
         }
 
-        std::cerr << std::endl << "Generating B_L list..." << std::endl;
+        std::cout << std::endl << "Generating B_L list..." << std::endl;
         for (auto it : dbg_kmers) {
-            const auto &anode = nodes_outgoing[dbg_kmers.rank(it) - 1];
+            const auto &anode = nodes_outgoing[dbg_kmers.rank(it)];
             std::cout << std::string(count_outgoing_edges(anode) - 1, '0') << "1";
         }
     }
 
 
 private:
-    inline void add_new_node(const uint64_t akmer, const uint64_t color_id, bool new_node, bool end_node, uint8_t pc) {
+    inline void add_new_node(const T akmer, const uint64_t color_id, bool new_node, bool end_node, uint8_t pc) {
         // static std::bitset<KMERBITS> pkmer;
         static uint64_t pkmer_rank;
         if (!new_node) {
@@ -293,7 +284,7 @@ private:
         // Note that if there is no akmer in dbg, it will be allocated
         // add_color(anode->colors, color_id);
 
-        pkmer_rank = dbg_kmers.rank(akmer) - 1;
+        pkmer_rank = dbg_kmers.rank(akmer);
         auto &anode = nodes_outgoing[pkmer_rank];
         // if (!new_node) {
         //     nodes_incoming[pkmer_rank].set();
@@ -304,7 +295,7 @@ private:
         }
     }
 
-    inline uint8_t count_outgoing_edges(const std::bitset<SIGMA + 1>& ar) {
+    inline uint8_t count_outgoing_edges(const std::bitset<SIGMA + 1> &ar) {
         uint8_t s = 0;
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
             s += ar[i];
@@ -313,14 +304,15 @@ private:
     }
 
 
-    inline uint8_t count_incoming_edges(uint64_t pkmer) {
+    inline uint8_t count_incoming_edges(T pkmer) {
+        static T mask = (((T)1 << kmer_bits) - 1);
         uint8_t s = 0;
         // uint64_t akmer = pkmer;
         uint8_t ac = symbol_to_id(bits_to_char((uint8_t) (pkmer >> (kmer_bits - LOGSIGMA))));
-        pkmer = (pkmer << LOGSIGMA) & ((1 << kmer_bits) - 1);
+        pkmer = (pkmer << LOGSIGMA) & mask;
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
             pkmer ^= symbol_to_bits(base[i]);
-            if (dbg_kmers.contains(pkmer) && nodes_outgoing[dbg_kmers.rank(pkmer) - 1][ac]) {
+            if (dbg_kmers.contains(pkmer) && nodes_outgoing[dbg_kmers.rank(pkmer)][ac]) {
                 ++s;
             }
             pkmer ^= symbol_to_bits(base[i]);
@@ -330,14 +322,14 @@ private:
 
 
     // from a given bitstring generates the appropriate kmer string
-    std::string kmer_to_str(const uint64_t kmer_str) {
+    std::string kmer_to_str(const T kmer_str) {
         std::stringstream ss;
         // ss << str.to_string() << std::endl;
         for (int i = 0; i < km; ++i) {
             uint8_t ac = 0;
             for (int j = LOGSIGMA - 1; j >= 0; --j) {
                 ac <<= 1;
-                ac |= ((kmer_str & (1 << (i * LOGSIGMA + j))) != 0) ? 1 : 0;
+                ac |= ((kmer_str & ((T)1 << (i * LOGSIGMA + j))) != 0) ? 1 : 0;
             }
             ss << bits_to_char(ac);
         }
@@ -345,19 +337,20 @@ private:
     }
 
 
-    void print_node(const uint64_t &str, uint64_t icnt, uint64_t ocnt) {
-        std::cout << kmer_to_str(str) << std::endl;
+    void print_node(const T str, uint64_t icnt, uint64_t ocnt) {
+        static T mask = (((T)1 << kmer_bits) - 1);
+        std::cout << std::bitset<31 * LOGSIGMA>(str).to_string() << std::endl << kmer_to_str(str) << std::endl;
 
         // print the in edges
         std::cout << std::endl << "in edges:  ";
-        uint64_t akmer = str;
+        T akmer = str;
         // the last added character
         uint8_t ac = symbol_to_id(bits_to_char((uint8_t) (akmer >> (kmer_bits - LOGSIGMA))));
         // generate all the possible (SIGMA + 1) k-mers that could be the source
-        akmer = (akmer << LOGSIGMA) & ((1 << kmer_bits) - 1);
+        akmer = (akmer << LOGSIGMA) & mask;
         for (int i = 0; i < SIGMA + 1; ++i) {
             akmer ^= symbol_to_bits(base[i]);
-            if (dbg_kmers.contains(akmer) && nodes_outgoing[dbg_kmers.rank(akmer) - 1][ac]) {
+            if (dbg_kmers.contains(akmer) && nodes_outgoing[dbg_kmers.rank(akmer)][ac]) {
                 std::cout << base[i] << " ";
             }
             akmer ^= symbol_to_bits(base[i]);
@@ -366,7 +359,7 @@ private:
 
         // print the out edges
         std::cout << std::endl << "out edges: ";
-        const auto &anode = nodes_outgoing[dbg_kmers.rank(str) - 1];
+        const auto &anode = nodes_outgoing[dbg_kmers.rank(str)];
         for (int i = 0; i < SIGMA + 1; ++i) {
             if (anode[i]) {
                 std::cout << base[i] << " ";
@@ -404,14 +397,19 @@ private:
     uint8_t km;
     uint16_t kmer_bits;
 
-    Roaring64Map dbg_kmers;
+    // sparse_hash_map<std::bitset<KMERBITS>, Node<COLORBITS>> dbg;
 
-    typedef typename stxxl::VECTOR_GENERATOR<std::bitset<SIGMA + 1>>::result vector;
+
+    // Roaring64Map dbg_kmers;
+    bitset_wrapper<T, BitSetClass, Iterator_Type> dbg_kmers;
+
+    // typedef typename stxxl::VECTOR_GENERATOR<std::bitset<SIGMA + 1>>::result vector;
+    typedef typename std::vector<std::bitset<SIGMA + 1>> vector;
     vector nodes_outgoing;
     // vector nodes_ingoing;
 
     // number of edges
-    uint64_t M = 0;
+    size_t M = 0;
     const char base[5] = {'$', 'A', 'C', 'G', 'T'};
 
     // typedef int vt[10];
