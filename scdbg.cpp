@@ -21,9 +21,9 @@ using spp::sparse_hash_map;
 #define KMER40BYTES 320 / LOGSIGMA
 
 
-std::string parse_inputfile(const std::string &fname) {
-    std::ifstream myfile(fname);
-    std::string line;
+string parse_inputfile(const string &fname) {
+    ifstream myfile(fname);
+    string line;
     if (myfile.is_open()) {
         // the first line is just a header...
         getline(myfile, line);
@@ -35,7 +35,7 @@ std::string parse_inputfile(const std::string &fname) {
         return line;
     }
     else {
-        std::cerr << "Unable to open file '" << fname << "'" << std::endl;
+        cerr << "Unable to open file '" << fname << "'" << endl;
         exit(1);
     }
 }
@@ -43,24 +43,24 @@ std::string parse_inputfile(const std::string &fname) {
 
 class DBGWrapper {
 public:
-    DBGWrapper(uint8_t pkmer_size, uint32_t pcolors) : kmer_size(pkmer_size), colors(pcolors) {
+    DBGWrapper(const uint8_t pkmer_size, const uint32_t pcolors, const uint32_t psmd) : kmer_size(pkmer_size) {
         if (kmer_size <= KMER8BYTES) {
-            dbg8 = new DeBrujinGraph<64>(kmer_size, colors);
+            dbg8 = new DeBrujinGraph<64>(pkmer_size, pcolors, psmd);
         }
         else if (kmer_size <= KMER16BYTES) {
-            dbg16 = new DeBrujinGraph<128>(kmer_size, colors);
+            dbg16 = new DeBrujinGraph<128>(pkmer_size, pcolors, psmd);
         }
         else if (kmer_size <= KMER24BYTES) {
-            dbg24 = new DeBrujinGraph<192>(kmer_size, colors);
+            dbg24 = new DeBrujinGraph<192>(pkmer_size, pcolors, psmd);
         }
         else if (kmer_size <= KMER32BYTES) {
-            dbg32 = new DeBrujinGraph<256>(kmer_size, colors);
+            dbg32 = new DeBrujinGraph<256>(pkmer_size, pcolors, psmd);
         }
         else if (kmer_size <= KMER40BYTES) {
-            dbg40 = new DeBrujinGraph<320>(kmer_size, colors);
+            dbg40 = new DeBrujinGraph<320>(pkmer_size, pcolors, psmd);
         }
         else {
-            std::cerr << "Maximal k-mer size is " << KMER40BYTES << "..." << std::endl;
+            cerr << "Maximal k-mer size is " << KMER40BYTES << "..." << endl;
         }
     }
 
@@ -82,7 +82,7 @@ public:
         }
     }
 
-    void process_read(const std::string &dna_str, const uint32_t color_id, bool phase_first) {
+    void process_read(const string &dna_str, const uint32_t color_id, bool phase_first) {
         if (kmer_size <= KMER8BYTES) {
             dbg8->process_read(dna_str, color_id, phase_first);
         }
@@ -118,7 +118,7 @@ public:
         }
     }
 
-    void gen_succinct_dbg(std::string fname) {
+    void gen_succinct_dbg(string fname) {
         if (kmer_size <= KMER8BYTES) {
             dbg8->gen_succinct_dbg(fname);
         }
@@ -145,35 +145,35 @@ private:
     DeBrujinGraph<320>* dbg40 = nullptr;
 
     uint8_t kmer_size;
-    uint32_t colors;
 };
 
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
-        std::cerr << "usage: scdbg <kmer> <color> <input file> <output file>" << std::endl;
-        std::cerr << "example usage: ./scdbg 32 100 input_file output_file" << std::endl;
+        cerr << "usage: scdbg <kmer> <color> <sampling distance> <input file> <output file>" << endl;
+        cerr << "example usage: ./scdbg 32 100 100 input_file output_file" << endl;
         exit(1);
     }
 
-    uint8_t kmer_size = (uint8_t) std::stoul(argv[1]);
+    uint8_t kmer_size = (uint8_t) stoul(argv[1]);
     if (kmer_size > KMER40BYTES) {
-        std::cerr << "Maximal k-mer size is " << KMER40BYTES << "..." << std::endl;
+        cerr << "Maximal k-mer size is " << KMER40BYTES << "..." << endl;
         exit(1);
     }
 
-    uint32_t colors = (uint32_t)std::stoi(argv[2]);
+    uint32_t colors = (uint32_t)stoi(argv[2]);
+    uint32_t psmd = (uint32_t)stoi(argv[3]);
 
 
     // DBGWrapper dbg(kmer_size, colors);
-    // std::string dna_str = "TAATGCCATGGGATGTT";
+    // string dna_str = "TAATGCCATGGGATGTT";
     // dbg.process_read(dbg, dna_str, 0);
     // dbg.do_stats(dbg);
 
 
-    // DBGWrapper dbg(3, 1);
-    // std::string dna_str1 = "TACGTCGACGACT";
-    // std::string dna_str2 = "TACGCGACT";
+    // DBGWrapper dbg(3, 1, 100);
+    // string dna_str1 = "TACGTCGACGACT";
+    // string dna_str2 = "TACGCGACT";
     // // result:
     // // TCCGTGGGACTAAA$C
     // //  001111110111111    <-- B_F
@@ -186,17 +186,17 @@ int main(int argc, char *argv[]) {
     // dbg.gen_succinct_dbg(argv[4]);
 
 
-    DBGWrapper dbg(kmer_size, colors);
+    DBGWrapper dbg(kmer_size, colors, psmd);
     for (int i = 0; i < 2; ++i) {
-        std::cerr << "Start phase " << i << std::endl;
-        std::ifstream myfile(argv[3]);
-        std::string fname;
+        cerr << "Start phase " << i << endl;
+        ifstream myfile(argv[4]);
+        string fname;
 
         uint32_t color_id = 0;
         if (myfile.is_open()) {
             while (getline(myfile, fname)) {
-                std::string dna_str = parse_inputfile(fname);
-                // std::cout << dna_str.size() << std::endl;
+                string dna_str = parse_inputfile(fname);
+                // cout << dna_str.size() << endl;
                 dbg.process_read(dna_str, color_id, i == 0);
                 if (++color_id >= colors) {
                     break;
@@ -206,11 +206,11 @@ int main(int argc, char *argv[]) {
 
             if (i != 0) {
                 dbg.do_stats();
-                // dbg.gen_succinct_dbg(argv[4]);
+                // dbg.gen_succinct_dbg(argv[5]);
             }
         }
         else {
-            std::cout << "Unable to open file '" << argv[1] << "'" << std::endl;
+            cout << "Unable to open file '" << argv[1] << "'" << endl;
             exit(1);
         }
 
