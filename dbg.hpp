@@ -85,11 +85,11 @@ template<typename T = uint64_t, typename BitSetClass = Roaring64Map,
 class DeBrujinGraph {
 public:
 
-    DeBrujinGraph() : DeBrujinGraph(32) {}
+    DeBrujinGraph() : DeBrujinGraph(32, 10) { }
 
-    DeBrujinGraph(const uint8_t pkm) : km(pkm), kmer_bits(LOGSIGMA * pkm) {}
+    DeBrujinGraph(const uint8_t pkm, const uint32_t pc) : km(pkm), kmer_bits(LOGSIGMA * pkm), C(pc) { }
 
-    void process_read(const std::string &dna_str, const uint64_t color_id, bool phase_first = true) {
+    void process_read(const std::string &dna_str, const uint32_t color_id, bool phase_first = true) {
         static T sid;
         std::cerr << "process " << color_id << "..." << std::endl;
         // read the first KMER-sized substring will be $$$..$
@@ -98,10 +98,12 @@ public:
         T akmer = 0;
 
         if (!phase_first && !second_phase_started) {
-            nodes_outgoing.resize(dbg_kmers.size());
-            for (uint64_t i = 0; i < nodes_outgoing.size(); ++i) {
-                nodes_outgoing[i] = 0;
-            }
+            nodes_outgoing.resize(dbg_kmers.size(), 0);
+            colors.resize(dbg_kmers.size());
+            // for (uint64_t i = 0; i < dbg_kmers.size(); ++i) {
+            //     nodes_outgoing[i] = 0;
+            //
+            // }
 
             second_phase_started = true;
         }
@@ -130,7 +132,7 @@ public:
     }
 
     void do_stats() {
-        std::cout << "Creating statistics..." << std::endl;
+        std::cerr << "Creating statistics..." << std::endl;
 
         uint64_t num_of_nodes = dbg_kmers.size();
         uint64_t num_of_edges = 0;
@@ -146,8 +148,6 @@ public:
         // uint64_t
         // uint64_t colored_branches = 0;
         // sparse_hash_map<std::bitset<COLORBITS>, std::bitset<1> > colors;
-
-        std::cerr << dbg_kmers.size() << std::endl;
 
         for (const auto &item : dbg_kmers) {
             // std::bitset<kmer_bits> bb = item;
@@ -192,6 +192,22 @@ public:
             // delete item.second;
         }
 
+        std::cerr << "Generate color stats..." << std::endl;
+        std::map<T, size_t> cm;
+        for (auto it : dbg_kmers) {
+            const size_t rank = dbg_kmers.rank(it);
+            const auto &anode = nodes_outgoing[rank];
+            for (uint8_t i = 0; i < SIGMA + 1; ++i) {
+                if (anode[i]) {
+                    T acolor;
+                    for (auto cindex : colors[rank][i]) {
+                        acolor |= 1 << cindex;
+                    }
+                    cm[acolor] += 1;
+                }
+            }
+        }
+
         std::cout << "in degrees:" << std::endl;
         for (int i = 0; i < SIGMA + 1; ++i) {
             std::cout << i << ": " << in_degrees[i] << std::endl;
@@ -207,8 +223,8 @@ public:
         std::cout << "k-mer size:\t\t\t" << (uint64_t) km << std::endl;
         std::cout << "# of nodes:\t\t\t" << num_of_nodes << std::endl;
         std::cout << "# of edges:\t\t\t" << (num_of_edges / 2) << std::endl;
-        // std::cout << "# of colors:\t\t\t" << (uint64_t) COLORBITS << std::endl;
-        // std::cout << "# of color classes:\t\t" << colors.size() << std::endl;
+        std::cout << "# of colors:\t\t\t" << (uint64_t) C << std::endl;
+        std::cout << "# of color classes:\t\t" << cm.size() << std::endl;
         std::cout << "#source nodes:\t\t\t" << source << "\t\t\t" << (float) source / num_of_nodes << "%" << std::endl;
         std::cout << "#sink nodes:\t\t\t" << sink << "\t\t\t" << (float) sink / num_of_nodes << "%" << std::endl;
         std::cout << "#in, out = 1:\t\t\t" << in_out_one << "\t\t\t" << (float) in_out_one / num_of_nodes << "%"
@@ -239,9 +255,9 @@ public:
     };
 
 
-    void gen_succinct_dbg() {
+    void gen_succinct_dbg(std::string fname) {
         std::cerr << "Generating Succinct De Bruijn Graph..." << std::endl;
-        std::cout << "Generating Edge list..." << std::endl;
+        std::cerr << "Generating Edge list..." << std::endl;
         for (auto it : dbg_kmers) {
             const auto &anode = nodes_outgoing[dbg_kmers.rank(it)];
             for (uint8_t i = 0; i < SIGMA + 1; ++i) {
@@ -250,9 +266,8 @@ public:
                 }
             }
         }
-        std::cout << std::endl;
 
-        std::cout << "Generating B_F list..." << std::endl;
+        std::cerr << "Generating B_F list..." << std::endl;
         for (auto it : dbg_kmers) {
             // const auto &anode = nodes_ingoing[dbg_kmers.rank(it)];
             int ic = count_incoming_edges(it);
@@ -264,7 +279,7 @@ public:
             }
         }
 
-        std::cout << std::endl << "Generating B_L list..." << std::endl;
+        std::cerr << std::endl << "Generating B_L list..." << std::endl;
         for (auto it : dbg_kmers) {
             const auto &anode = nodes_outgoing[dbg_kmers.rank(it)];
             std::cout << std::string(count_outgoing_edges(anode) - 1, '0') << "1";
@@ -273,12 +288,13 @@ public:
 
 
 private:
-    inline void add_new_node(const T akmer, const uint64_t color_id, bool new_node, bool end_node, uint8_t pc) {
+    inline void add_new_node(const T akmer, const uint32_t color_id, bool new_node, bool end_node, uint8_t pc) {
         // static std::bitset<KMERBITS> pkmer;
         static uint64_t pkmer_rank;
         if (!new_node) {
             // dbg[pkmer].out_edges.set(pc);
             nodes_outgoing[pkmer_rank].set(pc);
+            colors[pkmer_rank][pc].add(color_id);
         }
 
         // Note that if there is no akmer in dbg, it will be allocated
@@ -406,10 +422,12 @@ private:
     // typedef typename stxxl::VECTOR_GENERATOR<std::bitset<SIGMA + 1>>::result vector;
     typedef typename std::vector<std::bitset<SIGMA + 1>> vector;
     vector nodes_outgoing;
+    std::vector<std::array<Roaring, SIGMA + 1>> colors;
     // vector nodes_ingoing;
 
     // number of edges
     size_t M = 0;
+    uint32_t C;
     const char base[5] = {'$', 'A', 'C', 'G', 'T'};
 
     // typedef int vt[10];

@@ -6,17 +6,8 @@
 #include <algorithm>
 #include <boost/multiprecision/cpp_int.hpp>
 
-template<typename iterator_type>
-class KeyIterator {
-    iterator_type iterator;
-public:
-    typedef typename std::iterator_traits<iterator_type>::value_type::first_type value_type;
-    KeyIterator(iterator_type i) : iterator(i) {}
-    value_type operator*() { return iterator->first; }
-    KeyIterator & operator++() { ++iterator; return *this; }
-    bool operator!=(const KeyIterator & right) const { return iterator != right.iterator; }
-};
-
+// typedef __int128 int128_t;
+// typedef unsigned __int128 uint128_t;
 
 template<typename T, typename BitSetClass, typename Iterator_Type>
 class bitset_wrapper {
@@ -25,7 +16,7 @@ public:
 
     inline void add(const T);
 
-    inline T rank(const T);
+    inline size_t rank(const T);
 
     inline bool contains(const T) const;
 
@@ -45,7 +36,13 @@ uint64_t bitset_wrapper<uint64_t, Roaring64Map, Roaring64MapSetBitForwardIterato
 }
 
 template<>
-size_t bitset_wrapper<uint128_t, std::map<uint128_t, size_t>, std::map<uint128_t, size_t>::iterator>::size() const {
+size_t bitset_wrapper<uint64_t, std::map<uint64_t, size_t>, std::map<uint64_t, size_t>::iterator>::size() const {
+    return dbg_kmers.size();
+}
+
+template<>
+size_t bitset_wrapper<boost::multiprecision::uint128_t, std::map<boost::multiprecision::uint128_t, size_t>,
+        std::map<boost::multiprecision::uint128_t, size_t>::iterator>::size() const {
     return dbg_kmers.size();
 }
 
@@ -63,8 +60,16 @@ void bitset_wrapper<uint64_t, Roaring64Map, Roaring64MapSetBitForwardIterator>::
 }
 
 template<>
-void bitset_wrapper<uint128_t, std::map<uint128_t, size_t>, std::map<uint128_t, size_t>::iterator>::add(
-        const uint128_t x) {
+void bitset_wrapper<uint64_t, std::map<uint64_t, size_t>, std::map<uint64_t, size_t>::iterator>::add(
+        const uint64_t x) {
+    dbg_kmers[x] = 0;
+}
+
+template<>
+void
+bitset_wrapper<boost::multiprecision::uint128_t, std::map<boost::multiprecision::uint128_t, size_t>,
+        std::map<boost::multiprecision::uint128_t, size_t>::iterator>::add(
+        const boost::multiprecision::uint128_t x) {
     dbg_kmers[x] = 0;
 }
 
@@ -81,8 +86,8 @@ uint64_t bitset_wrapper<uint64_t, Roaring64Map, Roaring64MapSetBitForwardIterato
 }
 
 template<>
-uint128_t
-bitset_wrapper<uint128_t, std::map<uint128_t, size_t>, std::map<uint128_t, size_t>::iterator>::rank(const uint128_t x) {
+size_t
+bitset_wrapper<uint64_t, std::map<uint64_t, size_t>, std::map<uint64_t, size_t>::iterator>::rank(const uint64_t x) {
     // for the first time calling the rank operation - calculate the indexes of the entries of dbg_kmers
     if (first_rank) {
         size_t i = 0;
@@ -95,8 +100,21 @@ bitset_wrapper<uint128_t, std::map<uint128_t, size_t>, std::map<uint128_t, size_
 }
 
 template<>
-boost::multiprecision::uint256_t
-bitset_wrapper<boost::multiprecision::uint256_t, std::map<boost::multiprecision::uint256_t, size_t>,
+size_t bitset_wrapper<boost::multiprecision::uint128_t, std::map<boost::multiprecision::uint128_t, size_t>,
+        std::map<boost::multiprecision::uint128_t, size_t>::iterator>::rank(const boost::multiprecision::uint128_t x) {
+    // for the first time calling the rank operation - calculate the indexes of the entries of dbg_kmers
+    if (first_rank) {
+        size_t i = 0;
+        for (auto it = dbg_kmers.begin(); it != dbg_kmers.end(); ++it) {
+            it->second = i++;
+        }
+        first_rank = false;
+    }
+    return dbg_kmers[x];
+}
+
+template<>
+size_t bitset_wrapper<boost::multiprecision::uint256_t, std::map<boost::multiprecision::uint256_t, size_t>,
         std::map<boost::multiprecision::uint256_t, size_t>::iterator>::rank(const boost::multiprecision::uint256_t x) {
     // for the first time calling the rank operation - calculate the indexes of the entries of dbg_kmers
     if (first_rank) {
@@ -116,8 +134,16 @@ bool bitset_wrapper<uint64_t, Roaring64Map, Roaring64MapSetBitForwardIterator>::
 }
 
 template<>
-bool bitset_wrapper<uint128_t, std::map<uint128_t, size_t>, std::map<uint128_t, size_t>::iterator>::contains(
-        const uint128_t x) const {
+bool bitset_wrapper<uint64_t, std::map<uint64_t, size_t>, std::map<uint64_t, size_t>::iterator>::contains(
+        const uint64_t x) const {
+    return dbg_kmers.find(x) != dbg_kmers.end();
+}
+
+template<>
+bool
+bitset_wrapper<boost::multiprecision::uint128_t, std::map<boost::multiprecision::uint128_t, size_t>,
+        std::map<boost::multiprecision::uint128_t, size_t>::iterator>::contains(
+        const boost::multiprecision::uint128_t x) const {
     return dbg_kmers.find(x) != dbg_kmers.end();
 }
 
