@@ -23,22 +23,24 @@ using spp::sparse_hash_map;
 //log_2(SIGMA + 1)
 #define LOGSIGMA    3
 
-#define MAXDISTANCE 100
 
 static inline uint8_t symbol_to_bits(const char c);
+
 static inline char bits_to_char(uint8_t s);
+
 static inline uint8_t symbol_to_id(const char c);
+
 static const char base[5] = {'$', 'A', 'C', 'G', 'T'};
 
 
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 class DeBrujinGraph {
 public:
 
-    DeBrujinGraph() : DeBrujinGraph(32, 10, 100) { }
+    DeBrujinGraph() : DeBrujinGraph(32, 10, -1) {}
 
-    DeBrujinGraph(const uint8_t pkm, const uint32_t pc, const uint32_t psmd) : km(pkm),
-                                                                               C(pc), sampling_max_distance(psmd) {
+    DeBrujinGraph(const uint8_t pkm, const uint32_t pc, const int psmd = -1) : km(pkm), sampling_max_distance(psmd),
+                                                                               C(pc) {
         kmer_bits = LOGSIGMA * pkm;
 
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
@@ -48,16 +50,16 @@ public:
         }
     }
 
-    void process_read(const string &dna_str, const uint32_t color_id, bool phase_first = true);
+    void process_read(const string &dna_str, const uint32_t color_id, bool phase_first);
 
     void do_stats();
 
 
-    void gen_succinct_dbg(string fname);
+    void gen_succinct_dbg(const string fname);
 
 
 private:
-    inline void add_new_node(const bitset<KMERBITS> &akmer, const uint32_t color_id, bool new_node, uint8_t pc);
+    inline void add_new_node(const bitset<KMERBITS> &akmer, bool new_node, uint8_t pc);
 
     inline uint8_t outdegree(const bitset<SIGMA + 1> &ar);
 
@@ -74,7 +76,7 @@ private:
 
     uint8_t km;
     static uint16_t kmer_bits;
-    uint32_t sampling_max_distance;
+    int sampling_max_distance;
     size_t explicitly_stored_colors = 0;
 
     // functor for comparing two given bitsets lexicographically
@@ -91,9 +93,9 @@ private:
         }
     };
 
-    // sparse_hash_map<bitset<KMERBITS>, uint8_t> dbg_kmers;
+    sparse_hash_map<bitset<KMERBITS>, uint8_t> dbg_kmers;
     sparse_hash_map<bitset<KMERBITS>, array<Roaring, SIGMA + 1>> colors;
-    map<bitset<KMERBITS>, uint8_t, compare_lexicographically<KMERBITS>> dbg_kmers;
+    // map<bitset<KMERBITS>, uint8_t, compare_lexicographically<KMERBITS>> dbg_kmers;
 
     // number of edges
     size_t M = 0;

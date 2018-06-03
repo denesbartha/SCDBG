@@ -13,7 +13,7 @@
 
 class DBGWrapper {
 public:
-    DBGWrapper(const uint8_t pkmer_size, const uint32_t pcolors, const uint32_t psmd) : kmer_size(pkmer_size) {
+    DBGWrapper(const uint8_t pkmer_size, const uint32_t pcolors, const int psmd = -1) : kmer_size(pkmer_size) {
         if (kmer_size <= KMER8BYTES) {
             dbg8 = new DeBrujinGraph<64>(pkmer_size, pcolors, psmd);
         }

@@ -1,6 +1,8 @@
 #include "dbg.h"
 
-template<uint8_t KMERBITS>
+#define MAXCOLORS  95146
+
+template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t color_id, bool phase_first) {
     // static T sid;
     cerr << "process " << color_id << "..." << endl;
@@ -22,43 +24,52 @@ void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t
 
     // read the rest of the dna string...
     if (phase_first) {
-        add_new_node(akmer, color_id, true, 255);
+        add_new_node(akmer, true, 255);
         for (uint64_t i = 0, sl = dna_str.length(); i < sl; ++i) {
             uint8_t sid = symbol_to_id(dna_str[i]);
             if (sid != 255) {
                 akmer >>= LOGSIGMA;
                 akmer |= shifted_sids[sid];
-                add_new_node(akmer, color_id, false, symbol_to_id(dna_str[i]));
+                add_new_node(akmer, false, sid);
             }
         }
         // the last edge leads to $...
         dbg_kmers[akmer] |= 1;
     }
     else {
-
+        for (uint64_t i = 0, sl = dna_str.length(); i < sl; ++i) {
+            uint8_t sid = symbol_to_id(dna_str[i]);
+            if (sid != 255) {
+                akmer >>= LOGSIGMA;
+                akmer |= shifted_sids[sid];
+                if (colors.find(akmer) != colors.end()) {
+                    colors[akmer][sid].add(color_id);
+                }
+            }
+        }
     }
 }
 
 
-template<uint8_t KMERBITS>
-inline void DeBrujinGraph<KMERBITS>::add_new_node(const bitset<KMERBITS> &akmer, const uint32_t color_id, bool new_node,
-                                                  uint8_t pc) {
+template<uint16_t KMERBITS>
+inline void DeBrujinGraph<KMERBITS>::add_new_node(const bitset<KMERBITS> &akmer, bool new_node, uint8_t pc) {
     static bitset<KMERBITS> pkmer;
     if (!new_node) {
         dbg_kmers[pkmer] |= 1 << pc;
     }
 
     // Note that if there is no akmer in dbg_kmers, it will get allocated
-    auto &anode = dbg_kmers[akmer];
+    dbg_kmers[akmer];
 
     pkmer = akmer;
 }
 
 
-template<uint8_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(string fname) {
+template<uint16_t KMERBITS>
+void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
     cerr << "Generating Succinct De Bruijn Graph..." << endl;
     cerr << "Generating Edge list..." << endl;
+
     for (auto it : dbg_kmers) {
         // cout << it.first.to_string() << endl;
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
@@ -88,15 +99,15 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(string fname) {
 }
 
 
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::do_sampling() {
     // maximum distance without
-    size_t max_distance = max(sampling_max_distance, (uint32_t) log2(dbg_kmers.size()));
+    int max_distance = max(sampling_max_distance, (int) log2(dbg_kmers.size()));
     cerr << "Starting sampling process with max distance: " << max_distance << "..." << std::endl;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         uint32_t outdeg = outdegree(dbg_kmers[it->first]);
-        if (!visited[it->first] && outdeg > 1 || it == dbg_kmers.cbegin()) {
+        if ((!visited[it->first] && outdeg > 1) || it == dbg_kmers.cbegin()) {
             // store the colours on each branching node...
             colors[it->first];
             explicitly_stored_colors += outdeg;
@@ -137,7 +148,7 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
 }
 
 
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::do_stats() {
     cerr << "Creating statistics..." << endl;
 
@@ -158,8 +169,9 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
     // sparse_hash_map<bitset<KMERBITS>, uint8_t> cs;
 
     // for (const auto &item : dbg_kmers) {
+    sparse_hash_map<bitset<MAXCOLORS>, size_t> cm;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
-    map<size_t, size_t> paths;
+    sparse_hash_map<size_t, size_t> paths;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         // bitset<kmer_bits> bb = item;
         // cout << bb.to_string() << " " << nodes_outgoing[dbg_kmers.rank(item) - 1] << endl;
@@ -173,7 +185,6 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
         num_of_edges += icnt + ocnt;
 
         // colors[item.second.colors] = 1;
-
         // print_node(item.first, icnt, ocnt);
 
         if (icnt == 1 && ocnt == 1) {
@@ -203,7 +214,7 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
 
 
         // traverse the paths
-        if (!visited[it->first] && ocnt > 1 || it == dbg_kmers.cbegin()) {
+        if ((visited.find(it->first) == visited.end() && ocnt > 1) || it == dbg_kmers.cbegin()) {
             for (uint8_t i = 0; i < SIGMA + 1; ++i) {
                 if (((1 << i) & it->second) != 0) {
                     size_t path_length = 1;
@@ -233,12 +244,26 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
                 }
             }
         }
-
         visited[it->first] = true;
+
+        // color stats...
+        // cerr << "Generate color stats..." << endl;
+        if (colors.find(it->first) != colors.end()) {
+            for (uint8_t i = 0; i < SIGMA + 1; ++i) {
+                if (((1 << i) & it->second) != 0) {
+                    bitset<MAXCOLORS> acolor;
+                    auto &rc = colors[it->first][i];
+                    for (uint32_t j = 0; j < C; ++j) {
+                        acolor[j] = rc.contains(j);
+                    }
+                    // cout << colors[it->first][i];
+                    // bitset<100> bss(colors[it->first][i].toString());
+                    cm[acolor]++;
+                }
+            }
+        }
     }
 
-    cerr << "Generate color stats..." << endl;
-    map<bitset<KMERBITS>, size_t> cm;
 
     cout << "in degrees:" << endl;
     for (int i = 0; i < SIGMA + 1; ++i) {
@@ -284,7 +309,7 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
 }
 
 
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 inline uint8_t DeBrujinGraph<KMERBITS>::outdegree(const bitset<SIGMA + 1> &ar) {
     uint8_t s = 0;
     for (uint8_t i = 0; i < SIGMA + 1; ++i) {
@@ -294,7 +319,7 @@ inline uint8_t DeBrujinGraph<KMERBITS>::outdegree(const bitset<SIGMA + 1> &ar) {
 }
 
 
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 inline uint8_t DeBrujinGraph<KMERBITS>::indegree(bitset<KMERBITS> pkmer) {
     static const bitset<KMERBITS> mask(string(kmer_bits, '1'));
     uint8_t s = 0;
@@ -314,7 +339,7 @@ inline uint8_t DeBrujinGraph<KMERBITS>::indegree(bitset<KMERBITS> pkmer) {
 
 
 // from a given bitstring generates the appropriate kmer string
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 string DeBrujinGraph<KMERBITS>::kmer_to_str(bitset<KMERBITS> kmer_str) {
     static const bitset<KMERBITS> mask(string(LOGSIGMA, '1'));
     stringstream ss;
@@ -328,7 +353,7 @@ string DeBrujinGraph<KMERBITS>::kmer_to_str(bitset<KMERBITS> kmer_str) {
 }
 
 
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint64_t icnt, uint64_t ocnt) {
     static const bitset<KMERBITS> mask(string(kmer_bits, '1'));
     cerr << bitset<KMERBITS>(str).to_string() << endl << kmer_to_str(str) << endl;
@@ -384,7 +409,7 @@ void DeBrujinGraph<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint64_t i
 
 
 // define static variables
-template<uint8_t KMERBITS>
+template<uint16_t KMERBITS>
 uint16_t DeBrujinGraph<KMERBITS>::kmer_bits = 0;
 
 
