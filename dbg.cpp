@@ -163,6 +163,7 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
     uint64_t branching_in_or_out = 0;
     uint64_t source = 0;
     uint64_t sink = 0;
+    uint64_t maxpath_length = 0;
     // uint64_t
     // uint64_t colored_branches = 0;
     // sparse_hash_map<bitset<COLORBITS>, bitset<1> > colors;
@@ -241,6 +242,9 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
                     else {
                         paths[path_length] = 1;
                     }
+                    if (path_length > maxpath_length) {
+                        maxpath_length = path_length;
+                    }
                 }
             }
         }
@@ -297,7 +301,7 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
     cout << "#brancing in or out > 1:\t" << branching_in_or_out << "\t\t\t"
          << (float) branching_in_or_out / num_of_nodes << "%" << endl;
 
-    cout << "maximal path legth:\t\t" << paths.crbegin()->first << " " << paths.rbegin()->second << endl;
+    cout << "maximal path legth:\t\t" << maxpath_length << " " << paths[maxpath_length] << endl;
 
     size_t ps = 0;
     size_t os = 0;
@@ -305,7 +309,7 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
         ps += it->first * it->second;
         os += it->second;
     }
-    cout << "average path legth:\t\t" << (double) ps / os << " " << paths.rbegin()->second << endl;
+    cout << "average path legth:\t\t" << (double) ps / os << endl;
 }
 
 
