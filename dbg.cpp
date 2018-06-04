@@ -1,24 +1,18 @@
+#include <deque>
+#include <sstream>
+#include <algorithm>
+
 #include "dbg.h"
 
-#define MAXCOLORS  95146
 
 template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t color_id, bool phase_first) {
-    // static T sid;
     cerr << "process " << color_id << "..." << endl;
-    // read the first KMER-sized substring will be $$$..$
-    // boost::multiprecision::uint256_t akmer = 0;
-    bitset<KMERBITS> akmer = 0;
+    // the first KMER-sized substring will be $$$...$
+    bitset<KMERBITS> akmer = 0, pkmer = 0;
 
     if (!phase_first && !second_phase_started) {
-        // nodes_outgoing.resize(dbg_kmers.size(), 0);
-        // colors.resize(dbg_kmers.size());
-        // for (uint64_t i = 0; i < dbg_kmers.size(); ++i) {
-        //     nodes_outgoing[i] = 0;
-        //
-        // }
         do_sampling();
-
         second_phase_started = true;
     }
 
@@ -37,16 +31,19 @@ void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t
         dbg_kmers[akmer] |= 1;
     }
     else {
+        colors[akmer];
         for (uint64_t i = 0, sl = dna_str.length(); i < sl; ++i) {
             uint8_t sid = symbol_to_id(dna_str[i]);
             if (sid != 255) {
                 akmer >>= LOGSIGMA;
                 akmer |= shifted_sids[sid];
-                if (colors.find(akmer) != colors.end()) {
-                    colors[akmer][sid].add(color_id);
+                if (colors.find(pkmer) != colors.end()) {
+                    colors[pkmer][sid].add(color_id);
                 }
+                pkmer = akmer;
             }
         }
+        colors[pkmer][0].add(color_id);
     }
 }
 
@@ -98,16 +95,27 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
     // }
 }
 
+template<typename KT, typename VT>
+static size_t map_key_difference(const sparse_hash_map<KT, VT> &left, const sparse_hash_map<KT, VT> &right) {
+    size_t s = 0;
+    for (auto it = left.cbegin(); it != left.cend(); ++it) {
+        if (right.find(it->first) == right.end()) {
+            ++s;
+        }
+    }
+
+    return s;
+}
 
 template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::do_sampling() {
     // maximum distance without
-    int max_distance = max(sampling_max_distance, (int) log2(dbg_kmers.size()));
+    uint32_t max_distance = max(sampling_max_distance, (uint32_t) log2(dbg_kmers.size()));
     cerr << "Starting sampling process with max distance: " << max_distance << "..." << std::endl;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         uint32_t outdeg = outdegree(dbg_kmers[it->first]);
-        if ((!visited[it->first] && outdeg > 1) || it == dbg_kmers.cbegin()) {
+        if (!visited[it->first] && (outdeg > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
             // store the colours on each branching node...
             colors[it->first];
             explicitly_stored_colors += outdeg;
@@ -164,20 +172,12 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
     uint64_t source = 0;
     uint64_t sink = 0;
     uint64_t maxpath_length = 0;
-    // uint64_t
-    // uint64_t colored_branches = 0;
-    // sparse_hash_map<bitset<COLORBITS>, bitset<1> > colors;
-    // sparse_hash_map<bitset<KMERBITS>, uint8_t> cs;
 
-    // for (const auto &item : dbg_kmers) {
     sparse_hash_map<bitset<MAXCOLORS>, size_t> cm;
+    sparse_hash_map<bitset<MAXCOLORS>, size_t> cm_rest;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     sparse_hash_map<size_t, size_t> paths;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
-        // bitset<kmer_bits> bb = item;
-        // cout << bb.to_string() << " " << nodes_outgoing[dbg_kmers.rank(item) - 1] << endl;
-
-        // uint64_t icnt = count_edges(item.second->in_edges);
         uint64_t icnt = indegree(it->first);
         uint64_t ocnt = outdegree(dbg_kmers[it->first]);
         in_degrees[icnt]++;
@@ -248,22 +248,27 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
                 }
             }
         }
-        visited[it->first] = true;
+        visited[it->first] = 1;
 
         // color stats...
         // cerr << "Generate color stats..." << endl;
         if (colors.find(it->first) != colors.end()) {
             for (uint8_t i = 0; i < SIGMA + 1; ++i) {
                 if (((1 << i) & it->second) != 0) {
-                    bitset<MAXCOLORS> acolor;
-                    auto &rc = colors[it->first][i];
-                    for (uint32_t j = 0; j < C; ++j) {
-                        acolor[j] = rc.contains(j);
-                    }
-                    // cout << colors[it->first][i];
-                    // bitset<100> bss(colors[it->first][i].toString());
-                    cm[acolor]++;
+                    auto ac = colors[it->first][i];
+                    cm[color_to_bitset(ac)]++;
                 }
+            }
+
+            if (ocnt > 1) {
+
+            }
+        }
+        else if (ocnt > 1 || icnt > 1) {
+            cm_rest[color_to_bitset(get_color(it->first))]++;
+
+            if (ocnt > 1) {
+
             }
         }
     }
@@ -286,6 +291,7 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
     cout << "# of edges:\t\t\t" << (num_of_edges / 2) << endl;
     cout << "# of colors:\t\t\t" << (uint64_t) C << endl;
     cout << "# of color classes:\t\t" << cm.size() << endl;
+    cout << "# of color classes - not stored:\t" << map_key_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm) << endl;
     cout << "# of explicitly stored colors:\t" << explicitly_stored_colors << endl;
     cout << "#source nodes:\t\t\t" << source << "\t\t\t" << (float) source / num_of_nodes << "%" << endl;
     cout << "#sink nodes:\t\t\t" << sink << "\t\t\t" << (float) sink / num_of_nodes << "%" << endl;
@@ -328,7 +334,7 @@ inline uint8_t DeBrujinGraph<KMERBITS>::indegree(bitset<KMERBITS> pkmer) {
     static const bitset<KMERBITS> mask(string(kmer_bits, '1'));
     uint8_t s = 0;
     // uint64_t akmer = pkmer;
-    uint8_t ac = symbol_to_id(bits_to_char((uint8_t) (pkmer >> (kmer_bits - LOGSIGMA)).to_ulong()));
+    uint8_t ac = bits_to_id((uint8_t) (pkmer >> (kmer_bits - LOGSIGMA)).to_ulong());
     pkmer = (pkmer << LOGSIGMA) & mask;
     for (uint8_t i = 0; i < SIGMA + 1; ++i) {
         pkmer ^= symbol_to_bits(base[i]);
@@ -339,6 +345,52 @@ inline uint8_t DeBrujinGraph<KMERBITS>::indegree(bitset<KMERBITS> pkmer) {
         pkmer ^= symbol_to_bits(base[i]);
     }
     return s;
+}
+
+
+// Returns the colour of a given node
+template<uint16_t KMERBITS>
+inline Roaring DeBrujinGraph<KMERBITS>::get_color(const bitset<KMERBITS>& pkmer) {
+    static const bitset<KMERBITS> mask(string(kmer_bits, '1'));
+    Roaring rcolor;
+    uint8_t ac = 255;
+    deque<bitset<KMERBITS>> kmer_queue(1, pkmer);
+    while (!kmer_queue.empty()) {
+        auto akmer = kmer_queue.front();
+        kmer_queue.pop_front();
+        std::vector<bitset<KMERBITS>> incoming_nodes;
+        // step backwards until we find the color information or hit a branching node
+        while (colors.find(akmer) == colors.end() && indegree(akmer) <= 1) {
+            ac = bits_to_id((uint8_t) (akmer >> (kmer_bits - LOGSIGMA)).to_ulong());
+            akmer = (akmer << LOGSIGMA) & mask;
+            for (uint8_t i = 0; i < SIGMA + 1; ++i) {
+                akmer ^= symbol_to_bits(base[i]);
+                if (dbg_kmers.find(akmer) != dbg_kmers.end() && (dbg_kmers[akmer] & (1 << ac)) != 0) {
+                    // there is at most only one incoming node => break if we have found that
+                    break;
+                }
+                akmer ^= symbol_to_bits(base[i]);
+            }
+        }
+        // if we have found the color => merge it with the current one
+        if (colors.find(akmer) != colors.end()) {
+            rcolor |= colors[akmer][ac];
+        }
+        else {
+            // otherwise it is a B_{+,1} or B_{+,+} branching node => put the incoming edges to the queue and continue
+            ac = bits_to_id((uint8_t) (akmer >> (kmer_bits - LOGSIGMA)).to_ulong());
+            akmer = (akmer << LOGSIGMA) & mask;
+            for (uint8_t i = 0; i < SIGMA + 1; ++i) {
+                akmer ^= symbol_to_bits(base[i]);
+                if (dbg_kmers.find(akmer) != dbg_kmers.end() && (dbg_kmers[akmer] & (1 << ac)) != 0) {
+                    kmer_queue.push_back(akmer);
+                }
+                akmer ^= symbol_to_bits(base[i]);
+            }
+        }
+    }
+
+    return rcolor;
 }
 
 
@@ -358,6 +410,16 @@ string DeBrujinGraph<KMERBITS>::kmer_to_str(bitset<KMERBITS> kmer_str) {
 
 
 template<uint16_t KMERBITS>
+inline bitset<MAXCOLORS> DeBrujinGraph<KMERBITS>::color_to_bitset(const Roaring& rc) {
+    bitset<MAXCOLORS> acolor;
+    for (uint32_t j = 0; j < C; ++j) {
+        acolor[j] = rc.contains(j);
+    }
+    return acolor;
+}
+
+
+template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint64_t icnt, uint64_t ocnt) {
     static const bitset<KMERBITS> mask(string(kmer_bits, '1'));
     cerr << bitset<KMERBITS>(str).to_string() << endl << kmer_to_str(str) << endl;
@@ -366,7 +428,7 @@ void DeBrujinGraph<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint64_t i
     cout << endl << "in edges:  ";
     bitset<KMERBITS> akmer = str;
     // the last added character
-    uint8_t ac = symbol_to_id(bits_to_char((uint8_t) (akmer >> (kmer_bits - LOGSIGMA)).to_ulong()));
+    uint8_t ac = bits_to_id((uint8_t) (akmer >> (kmer_bits - LOGSIGMA)).to_ulong());
     // generate all the possible (SIGMA + 1) k-mers that could be the source
     akmer = (akmer << LOGSIGMA) & mask;
     for (int i = 0; i < SIGMA + 1; ++i) {
@@ -449,6 +511,24 @@ static inline char bits_to_char(uint8_t s) {
             return 'T';
         default:
             return 0;
+    }
+}
+
+
+static inline uint8_t bits_to_id(uint8_t s) {
+    switch (s) {
+        case 0b000:
+            return 0;
+        case 0b001:
+            return 1;
+        case 0b011:
+            return 2;
+        case 0b101:
+            return 3;
+        case 0b111:
+            return 4;
+        default:
+            return 255;
     }
 }
 
