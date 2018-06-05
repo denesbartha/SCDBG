@@ -75,14 +75,17 @@ int main(int argc, char *argv[]) {
 
         uint32_t color_id = 0;
         if (myfile.is_open()) {
+            cerr << "processing... " << endl;
             while (getline(myfile, fname)) {
                 string dna_str = parse_inputfile(fname);
                 // cout << dna_str.size() << endl;
+                cerr << color_id << " ";
                 dbg.process_read(dna_str, color_id, i == 0);
                 if (++color_id >= colors) {
                     break;
                 }
             }
+            cerr << endl;
             myfile.close();
 
             if (i != 0) {
