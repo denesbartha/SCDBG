@@ -61,8 +61,8 @@ int main(int argc, char *argv[]) {
     // dbg.process_read(dna_str2, 1, true);
     // dbg.process_read(dna_str1, 0, false);
     // dbg.process_read(dna_str2, 1, false);
-    // dbg.do_stats();
-    // dbg.gen_succinct_dbg(argv[4]);
+    // // dbg.do_stats();
+    // dbg.gen_succinct_dbg(argv[5]);
 
 
     uint32_t colors = (uint32_t)stoi(argv[2]);
@@ -89,15 +89,14 @@ int main(int argc, char *argv[]) {
             myfile.close();
 
             if (i != 0) {
-                dbg.do_stats();
-                // dbg.gen_succinct_dbg(argv[5]);
+                // dbg.do_stats();
+                dbg.gen_succinct_dbg(argv[5]);
             }
         }
         else {
             cout << "Unable to open file '" << argv[1] << "'" << endl;
             exit(1);
         }
-
     }
     return 0;
 }

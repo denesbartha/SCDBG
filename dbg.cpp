@@ -26,7 +26,7 @@ void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t
                 add_new_node(akmer, false, sid);
             }
         }
-        // the last edge leads to $...
+        // the last edge leads to $
         dbg_kmers[akmer] |= 1;
     }
     else {
@@ -65,34 +65,77 @@ inline void DeBrujinGraph<KMERBITS>::add_new_node(const bitset<KMERBITS> &akmer,
 template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
     cerr << "Generating Succinct De Bruijn Graph..." << endl;
-    cerr << "Generating Edge list..." << endl;
+    cerr << "Sorting edge list..." << endl;
 
-    for (auto it : dbg_kmers) {
-        // cout << it.first.to_string() << endl;
+    map<bitset<KMERBITS>, uint8_t, compare_lexicographically<KMERBITS>> dbg_kmers_sorted;
+
+    for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.end(); ++it) {
+        dbg_kmers_sorted[it->first] = it->second;
+    }
+    dbg_kmers.clear();
+
+    cerr << "Saving edge list to file..." << endl;
+    char buffer[LOGSIGMA * 8000] = { };
+    size_t buffer_index = 0;
+    ofstream f(fname, ios::out | ios::binary);
+    auto resetbuffer = [&f, &buffer, &buffer_index](size_t size){
+        f.write(buffer, size);
+        std::fill(buffer, buffer + size, 0);
+        buffer_index = 0;
+    };
+    for (auto it = dbg_kmers_sorted.cbegin(); it != dbg_kmers_sorted.cend(); ++it) {
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
-            if (((1 << i) & it.second) != 0) {
-                cout << base[i];
+            if (((1 << i) & it->second) != 0) {
+                // cout << base[i];
+                uint8_t ibits = id_to_bits(i);
+                for (uint8_t j = 0; j < LOGSIGMA; ++j, ++buffer_index) {
+                    if ((1 << j) & ibits) {
+                        buffer[buffer_index / 8] |= (1 << (buffer_index % 8));
+                    }
+                }
+                if ((buffer_index / 8) >= sizeof(buffer)) {
+                    resetbuffer(sizeof(buffer));
+                }
             }
         }
     }
+    if (buffer_index > 0) {
+        resetbuffer(buffer_index);
+    }
 
-    // cerr << "Generating B_F list..." << endl;
-    // for (auto it : dbg_kmers) {
-    //     // const auto &anode = nodes_ingoing[dbg_kmers.rank(it)];
-    //     int ic = indegree(it);
-    //     if (ic > 0) {
-    //         cout << string(ic - 1, '0') << "1";
-    //     }
-    //     else {
-    //         cout << " ";
-    //     }
-    // }
     //
     // cerr << endl << "Generating B_L list..." << endl;
     // for (auto it : dbg_kmers) {
     //     const auto &anode = nodes_outgoing[dbg_kmers.rank(it)];
     //     cout << string(outdegree(anode) - 1, '0') << "1";
     // }
+
+    auto gen_bin_list = [&dbg_kmers_sorted, &buffer, &buffer_index, &resetbuffer](auto fn) {
+        for (auto it = dbg_kmers_sorted.cbegin(); it != dbg_kmers_sorted.cend(); ++it) {
+            // const auto &anode = nodes_ingoing[dbg_kmers.rank(it)];
+            uint8_t ic = fn(it->first); //indegree(it->first);
+            if (ic > 0) {
+                buffer_index += ic;
+                if (buffer_index >= sizeof(buffer)) {
+                    size_t pbi = buffer_index;
+                    resetbuffer(sizeof(buffer));
+                    buffer_index = pbi % sizeof(buffer);
+                }
+                buffer[buffer_index / 8] |= (1 << (buffer_index % 8));
+            }
+            else {
+                // cout << " ";
+            }
+        }
+    };
+
+    cerr << "Generating B_F list..." << endl;
+    gen_bin_list([this](auto kmer) { return indegree(kmer); });
+
+    cerr << endl << "Generating B_L list..." << endl;
+    gen_bin_list([&dbg_kmers_sorted, this](auto kmer) { return outdegree(dbg_kmers_sorted[kmer]); });
+
+    f.close();
 }
 
 
@@ -117,8 +160,7 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         uint32_t outdeg = outdegree(dbg_kmers[it->first]);
-        if (!visited[it->first] &&
-            (outdeg > 1 || indegree(it->first) > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
+        if (!visited[it->first] && (outdeg > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
             // store the colours on each branching node...
             colors[it->first];
             explicitly_stored_colors += outdeg;
@@ -132,7 +174,8 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
                         bitset<KMERBITS> akmer = it->first;
                         akmer >>= LOGSIGMA;
                         akmer |= shifted_sids[i];
-                        while (outdegree(dbg_kmers[akmer]) == 1 && indegree(akmer) == 1) { // && indegree(akmer) == 1
+                        while (dbg_kmers.find(akmer) != dbg_kmers.end() && outdegree(dbg_kmers[akmer]) == 1) {
+                            // && indegree(akmer) == 1
                             visited[akmer] = 1;
                             auto &anode = dbg_kmers[akmer];
                             for (uint8_t j = 0; j < SIGMA + 1; ++j) {
@@ -230,7 +273,8 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
                     bitset<KMERBITS> akmer = it->first;
                     akmer >>= LOGSIGMA;
                     akmer |= shifted_sids[i];
-                    while (outdegree(dbg_kmers[akmer]) == 1) { // && indegree(akmer) == 1
+                    while (dbg_kmers.find(akmer) != dbg_kmers.end() && outdegree(dbg_kmers[akmer]) == 1) {
+                        // && indegree(akmer) == 1
                         visited[akmer] = 1;
                         auto &anode = dbg_kmers[akmer];
                         for (uint8_t j = 0; j < SIGMA + 1; ++j) {
@@ -544,7 +588,7 @@ static inline uint8_t symbol_to_bits(const char c) {
 }
 
 
-static inline char bits_to_char(uint8_t s) {
+static inline char bits_to_char(const uint8_t s) {
     switch (s) {
         case 0b000:
             return '$';
@@ -562,7 +606,7 @@ static inline char bits_to_char(uint8_t s) {
 }
 
 
-static inline uint8_t bits_to_id(uint8_t s) {
+static inline uint8_t bits_to_id(const uint8_t s) {
     switch (s) {
         case 0b000:
             return 0;
@@ -574,6 +618,24 @@ static inline uint8_t bits_to_id(uint8_t s) {
             return 3;
         case 0b111:
             return 4;
+        default:
+            return 255;
+    }
+}
+
+
+static inline uint8_t id_to_bits(const uint8_t i) {
+    switch (i) {
+        case 0:
+            return 0b000;
+        case 1:
+            return 0b001;
+        case 2:
+            return 0b011;
+        case 3:
+            return 0b101;
+        case 4:
+            return 0b111;
         default:
             return 255;
     }

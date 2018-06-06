@@ -25,9 +25,11 @@ using spp::sparse_hash_map;
 
 static inline uint8_t symbol_to_bits(const char c);
 
-static inline char bits_to_char(uint8_t s);
+static inline char bits_to_char(const uint8_t s);
 
-static inline uint8_t bits_to_id(uint8_t s);
+static inline uint8_t bits_to_id(const uint8_t s);
+
+static inline uint8_t id_to_bits(const uint8_t c);
 
 static inline uint8_t symbol_to_id(const char c);
 
