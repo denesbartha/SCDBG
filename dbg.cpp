@@ -78,9 +78,9 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
     char buffer[LOGSIGMA * 8000] = { };
     size_t buffer_index = 0;
     ofstream f(fname, ios::out | ios::binary);
-    auto resetbuffer = [&f, &buffer, &buffer_index](size_t size){
+    auto save_data = [&f, &buffer, &buffer_index](size_t size){
         f.write(buffer, size);
-        std::fill(buffer, buffer + size, 0);
+        std::fill(buffer, buffer + sizeof(buffer), 0);
         buffer_index = 0;
     };
     for (auto it = dbg_kmers_sorted.cbegin(); it != dbg_kmers_sorted.cend(); ++it) {
@@ -94,38 +94,32 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
                     }
                 }
                 if ((buffer_index / 8) >= sizeof(buffer)) {
-                    resetbuffer(sizeof(buffer));
+                    save_data(sizeof(buffer));
                 }
             }
         }
     }
     if (buffer_index > 0) {
-        resetbuffer(buffer_index);
+        save_data(buffer_index);
     }
 
-    //
-    // cerr << endl << "Generating B_L list..." << endl;
-    // for (auto it : dbg_kmers) {
-    //     const auto &anode = nodes_outgoing[dbg_kmers.rank(it)];
-    //     cout << string(outdegree(anode) - 1, '0') << "1";
-    // }
-
-    auto gen_bin_list = [&dbg_kmers_sorted, &buffer, &buffer_index, &resetbuffer](auto fn) {
+    auto gen_bin_list = [&dbg_kmers_sorted, &buffer, &buffer_index, &save_data](auto fn) {
         for (auto it = dbg_kmers_sorted.cbegin(); it != dbg_kmers_sorted.cend(); ++it) {
             // const auto &anode = nodes_ingoing[dbg_kmers.rank(it)];
-            uint8_t ic = fn(it->first); //indegree(it->first);
+
+            uint8_t ic = fn(it->first);
             if (ic > 0) {
-                buffer_index += ic;
+                buffer_index += ic - 1;
                 if (buffer_index >= sizeof(buffer)) {
                     size_t pbi = buffer_index;
-                    resetbuffer(sizeof(buffer));
+                    save_data(sizeof(buffer));
                     buffer_index = pbi % sizeof(buffer);
                 }
                 buffer[buffer_index / 8] |= (1 << (buffer_index % 8));
             }
-            else {
-                // cout << " ";
-            }
+        }
+        if (buffer_index > 0) {
+            save_data(buffer_index);
         }
     };
 
