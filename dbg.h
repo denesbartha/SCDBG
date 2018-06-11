@@ -56,25 +56,16 @@ public:
 
     void process_read(const string &dna_str, const uint32_t color_id, bool phase_first);
 
-    void do_stats();
-
     void gen_succinct_dbg(const string& fname);
 
-
-private:
+protected:
     inline void add_new_node(const bitset<KMERBITS> &akmer, bool new_node, uint8_t pc);
 
     inline uint8_t outdegree(const bitset<SIGMA + 1> &ar);
 
     inline uint8_t indegree(bitset<KMERBITS> pkmer);
 
-    Roaring get_color(const bitset<KMERBITS> &pkmer);
-
-    string kmer_to_str(bitset<KMERBITS> kmer_str);
-
     inline bitset<MAXCOLORS> color_to_bitset(const Roaring &rc);
-
-    void print_node(const bitset<KMERBITS> &str, uint64_t icnt, uint64_t ocnt);
 
     void do_sampling();
 
@@ -84,20 +75,6 @@ private:
     uint32_t kmer_bits;
     uint32_t sampling_max_distance;
     size_t explicitly_stored_colors = 0;
-
-    // functor for comparing two given bitsets lexicographically
-
-    // template<size_t N>
-    // struct compare_lexicographically {
-    //     bool operator()(const bitset<N> &x, const bitset<N> &y) {
-    //         for (int i = kmer_bits - 1; i >= 0; --i) {
-    //             if (x[i] ^ y[i]) {
-    //                 return y[i];
-    //             }
-    //         }
-    //         return false;
-    //     }
-    // };
 
     sparse_hash_map<bitset<KMERBITS>, uint8_t> dbg_kmers;
     sparse_hash_map<bitset<KMERBITS>, array<Roaring, SIGMA + 1>> colors;

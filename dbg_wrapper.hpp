@@ -3,6 +3,8 @@
 
 #include "dbg.h"
 #include "dbg.cpp"
+#include "dbg_stats.h"
+#include "dbg_stats.cpp"
 
 #define KMER8BYTES 64 / LOGSIGMA
 #define KMER16BYTES 128 / LOGSIGMA
@@ -72,19 +74,19 @@ public:
 
     void do_stats() {
         if (kmer_size <= KMER8BYTES) {
-            dbg8->do_stats();
+            ((DeBrujinGraphStats<64>*)dbg8)->do_stats();
         }
         else if (kmer_size <= KMER16BYTES) {
-            dbg16->do_stats();
+            ((DeBrujinGraphStats<128>*)dbg16)->do_stats();
         }
         else if (kmer_size <= KMER24BYTES) {
-            dbg24->do_stats();
+            ((DeBrujinGraphStats<192>*)dbg24)->do_stats();
         }
         else if (kmer_size <= KMER32BYTES) {
-            dbg32->do_stats();
+            ((DeBrujinGraphStats<256>*)dbg32)->do_stats();
         }
         else if (kmer_size <= KMER40BYTES) {
-            dbg40->do_stats();
+            ((DeBrujinGraphStats<320>*)dbg40)->do_stats();
         }
     }
 
