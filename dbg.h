@@ -14,13 +14,13 @@ using namespace std;
 using spp::sparse_hash_map;
 
 // SIGMA (for DNA, it is 4...)
-#define SIGMA       4
+#define SIGMA       4u
 
 //log_2(SIGMA + 1)
-#define LOGSIGMA    3
+#define LOGSIGMA    3u
 
 // maximum number of colors
-#define MAXCOLORS   100 // 95146
+#define MAXCOLORS   100u // 95146
 
 
 static inline uint8_t symbol_to_bits(const char c);
@@ -42,9 +42,10 @@ public:
 
     DeBrujinGraph() : DeBrujinGraph(32, 10, -1) {}
 
-    DeBrujinGraph(const uint8_t pkm, const uint32_t pc, const uint32_t psmd = 0) : km(pkm), sampling_max_distance(psmd),
+    DeBrujinGraph(const uint8_t pkm, const uint32_t pc, const uint32_t psmd = 0) : km(pkm), kmer_bits(LOGSIGMA * pkm),
+                                                                                   sampling_max_distance(psmd),
                                                                                    C(pc) {
-        kmer_bits = (uint16_t)LOGSIGMA * pkm;
+        // kmer_bits = (uint16_t)LOGSIGMA * pkm;
 
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
             bitset<KMERBITS> sid = symbol_to_bits(base[i]);
@@ -57,8 +58,7 @@ public:
 
     void do_stats();
 
-
-    void gen_succinct_dbg(const string fname);
+    void gen_succinct_dbg(const string& fname);
 
 
 private:
@@ -68,11 +68,11 @@ private:
 
     inline uint8_t indegree(bitset<KMERBITS> pkmer);
 
-    Roaring get_color(const bitset<KMERBITS>& pkmer);
+    Roaring get_color(const bitset<KMERBITS> &pkmer);
 
     string kmer_to_str(bitset<KMERBITS> kmer_str);
 
-    inline bitset<MAXCOLORS> color_to_bitset(const Roaring& rc);
+    inline bitset<MAXCOLORS> color_to_bitset(const Roaring &rc);
 
     void print_node(const bitset<KMERBITS> &str, uint64_t icnt, uint64_t ocnt);
 
@@ -81,23 +81,23 @@ private:
     array<bitset<KMERBITS>, SIGMA + 1> shifted_sids;
 
     uint8_t km;
-    static uint16_t kmer_bits;
+    uint32_t kmer_bits;
     uint32_t sampling_max_distance;
     size_t explicitly_stored_colors = 0;
 
     // functor for comparing two given bitsets lexicographically
 
-    template<size_t N>
-    struct compare_lexicographically {
-        bool operator()(const bitset<N> &x, const bitset<N> &y) {
-            for (int i = kmer_bits - 1; i >= 0; --i) {
-                if (x[i] ^ y[i]) {
-                    return y[i];
-                }
-            }
-            return false;
-        }
-    };
+    // template<size_t N>
+    // struct compare_lexicographically {
+    //     bool operator()(const bitset<N> &x, const bitset<N> &y) {
+    //         for (int i = kmer_bits - 1; i >= 0; --i) {
+    //             if (x[i] ^ y[i]) {
+    //                 return y[i];
+    //             }
+    //         }
+    //         return false;
+    //     }
+    // };
 
     sparse_hash_map<bitset<KMERBITS>, uint8_t> dbg_kmers;
     sparse_hash_map<bitset<KMERBITS>, array<Roaring, SIGMA + 1>> colors;

@@ -63,17 +63,35 @@ inline void DeBrujinGraph<KMERBITS>::add_new_node(const bitset<KMERBITS> &akmer,
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
+void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string& fname) {
     cerr << "Generating Succinct De Bruijn Graph..." << endl;
     cerr << "Sorting edge list..." << endl;
 
-    map<bitset<KMERBITS>, uint8_t, compare_lexicographically<KMERBITS>> dbg_kmers_sorted;
+    // map<bitset<KMERBITS>, uint8_t, DeBrujinGraph<KMERBITS>::compare_lexicographically<KMERBITS>> dbg_kmers_sorted;
 
-    for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.end(); ++it) {
-        dbg_kmers_sorted[it->first] = it->second;
+    typedef typename stxxl::VECTOR_GENERATOR<pair<bitset<KMERBITS>, uint8_t>>::result dbg_kmer_vector_type;
+    dbg_kmer_vector_type dbg_kmers_sorted;
+    dbg_kmers_sorted.resize(dbg_kmers.size());
+    for (auto it = dbg_kmers.cbegin(), i = 0; it != dbg_kmers.end(); ++it, ++i) {
+        dbg_kmers_sorted[i] = make_pair(it->first, it->second);
     }
-    dbg_kmers.clear();
 
+    std::sort(dbg_kmers_sorted.begin(), dbg_kmers_sorted.end(),
+            [this](const pair<bitset<KMERBITS>, uint8_t>& a, const pair<bitset<KMERBITS>, uint8_t>& b) -> bool {
+                for (int i = kmer_bits - 1; i >= 0; --i) {
+                    if (a.first[i] ^ b.first[i]) {
+                        return b.first[i];
+                    }
+                }
+                return false;
+            });
+
+
+    // for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.end(); ++it) {
+    //     dbg_kmers_sorted[it->first] = it->second;
+    // }
+    // dbg_kmers.clear();
+    //
     cerr << "Saving edge list to file..." << endl;
     char buffer[LOGSIGMA * 8000] = { };
     size_t buffer_index = 0;
@@ -83,13 +101,12 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
         std::fill(buffer, buffer + sizeof(buffer), 0);
         buffer_index = 0;
     };
-    for (auto it = dbg_kmers_sorted.cbegin(); it != dbg_kmers_sorted.cend(); ++it) {
-        for (uint8_t i = 0; i < SIGMA + 1; ++i) {
-            if (((1 << i) & it->second) != 0) {
-                // cout << base[i];
-                uint8_t ibits = id_to_bits(i);
-                for (uint8_t j = 0; j < LOGSIGMA; ++j, ++buffer_index) {
-                    if ((1 << j) & ibits) {
+    for (size_t i = 0; i < dbg_kmers_sorted.size(); ++i) {
+        for (uint8_t j = 0; j < SIGMA + 1; ++j) {
+            if (((1 << j) & dbg_kmers_sorted[i].second) != 0) {
+                uint8_t ibits = id_to_bits(j);
+                for (uint8_t k = 0; k < LOGSIGMA; ++k, ++buffer_index) {
+                    if ((1 << k) & ibits) {
                         buffer[buffer_index / 8] |= (1 << (buffer_index % 8));
                     }
                 }
@@ -127,7 +144,7 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string fname) {
     gen_bin_list([this](auto kmer) { return indegree(kmer); });
 
     cerr << endl << "Generating B_L list..." << endl;
-    gen_bin_list([&dbg_kmers_sorted, this](auto kmer) { return outdegree(dbg_kmers_sorted[kmer]); });
+    gen_bin_list([&dbg_kmers_sorted, this](auto kmer) { return outdegree(dbg_kmers[kmer]); });
 
     f.close();
 }
@@ -344,12 +361,12 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
 
 
     cout << "in degrees:" << endl;
-    for (int i = 0; i < SIGMA + 1; ++i) {
+    for (uint8_t i = 0; i < SIGMA + 1; ++i) {
         cout << i << ": " << in_degrees[i] << endl;
     }
 
     cout << "out degrees:" << endl;
-    for (int i = 0; i < SIGMA + 1; ++i) {
+    for (uint8_t i = 0; i < SIGMA + 1; ++i) {
         cout << i << ": " << out_degrees[i] << endl;
     }
 
@@ -362,7 +379,7 @@ void DeBrujinGraph<KMERBITS>::do_stats() {
     cout << "# of color classes:\t\t" << cm.size() << endl;
     cout << "# of color classes - not stored:\t" << sparse_hash_map_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm)
          << endl;
-    for (int i = 2; i <= SIGMA + 1; ++i) {
+    for (uint8_t i = 2; i <= SIGMA + 1; ++i) {
         cout << "# of B_{*," << i << "} nodes, where the color is the same:\t" << branching_color_is_the_same[i] << "/"
              << branching_outdegrees[i] << endl;
     }
@@ -559,9 +576,9 @@ void DeBrujinGraph<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint64_t i
 }
 
 
-// define static variables
-template<uint16_t KMERBITS>
-uint16_t DeBrujinGraph<KMERBITS>::kmer_bits = 0;
+// // define static variables
+// template<uint16_t KMERBITS>
+// uint16_t DeBrujinGraph<KMERBITS>::kmer_bits = 0;
 
 
 static inline uint8_t symbol_to_bits(const char c) {
@@ -641,12 +658,16 @@ static inline uint8_t symbol_to_id(const char c) {
         case '$':
             return 0;
         case 'A':
+        case 'a':
             return 1;
         case 'C':
+        case 'c':
             return 2;
         case 'G':
+        case 'g':
             return 3;
         case 'T':
+        case 't':
             return 4;
         default:
             return 255;
