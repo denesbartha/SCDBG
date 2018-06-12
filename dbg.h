@@ -56,18 +56,36 @@ public:
 
     void process_read(const string &dna_str, const uint32_t color_id, bool phase_first);
 
-    void gen_succinct_dbg(const string& fname);
+    void gen_succinct_dbg(const string &fname);
+
+private:
+    inline void add_new_node(const bitset<KMERBITS> &akmer, bool new_node, uint8_t pc);
+
+    void do_sampling();
+
+    void sort_dbg();
+
+    void save_edge_list(ofstream &f);
+
+    void save_table_F(ofstream &f);
+
+    void save_colors(const string &fname);
+
+    void save_color_classes(ostream &f, const sparse_hash_map<bitset<MAXCOLORS>, size_t> &color_classes,
+                            const multimap<size_t, bitset<MAXCOLORS>> &ordered_cm);
+
+    void save_store_vector(ostream &f);
+
+    void save_color_bit_vector(ostream &f, sparse_hash_map<bitset<MAXCOLORS>, size_t> &color_class_order,
+                                bool boundary);
 
 protected:
-    inline void add_new_node(const bitset<KMERBITS> &akmer, bool new_node, uint8_t pc);
 
     inline uint8_t outdegree(const bitset<SIGMA + 1> &ar);
 
     inline uint8_t indegree(bitset<KMERBITS> pkmer);
 
     inline bitset<MAXCOLORS> color_to_bitset(const Roaring &rc);
-
-    void do_sampling();
 
     array<bitset<KMERBITS>, SIGMA + 1> shifted_sids;
 
@@ -81,11 +99,15 @@ protected:
     // map<bitset<KMERBITS>, uint8_t, compare_lexicographically<KMERBITS>> dbg_kmers;
 
     // number of edges
-    size_t M = 0;
+    size_t num_of_edges = 0;
     // number of colors
     uint32_t C;
 
+private:
     bool second_phase_started = false;
+
+    typedef typename stxxl::VECTOR_GENERATOR<pair<bitset<KMERBITS>, uint8_t>>::result dbg_kmer_vector_type;
+    dbg_kmer_vector_type dbg_kmers_sorted;
 
     // Roaring64Map dbg_kmers;
     // bitset_wrapper<T, BitSetClass, Iterator_Type> dbg_kmers;

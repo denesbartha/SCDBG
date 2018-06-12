@@ -5,7 +5,6 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
     cerr << "Creating statistics..." << endl;
 
     uint64_t num_of_nodes = this->dbg_kmers.size();
-    uint64_t num_of_edges = 0;
     vector<uint64_t> in_degrees(SIGMA + 2, 0);
     vector<uint64_t> out_degrees(SIGMA + 2, 0);
     uint64_t in_out_one = 0;
@@ -30,8 +29,6 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
         uint64_t ocnt = this->outdegree(this->dbg_kmers[it->first]);
         in_degrees[icnt]++;
         out_degrees[ocnt]++;
-
-        num_of_edges += icnt + ocnt;
 
         // this->colors[item.second.this->colors] = 1;
         // print_node(item.first, icnt, ocnt);
@@ -162,7 +159,7 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
     cout << setprecision(5);
     cout << "k-mer size:\t\t\t" << (uint64_t) this->km << endl;
     cout << "# of nodes:\t\t\t" << num_of_nodes << endl;
-    cout << "# of edges:\t\t\t" << (num_of_edges / 2) << endl;
+    cout << "# of edges:\t\t\t" << this->num_of_edges << endl;
     cout << "# of colors:\t\t\t" << (uint64_t) this->C << endl;
     cout << "# of color classes:\t\t" << cm.size() << endl;
     cout << "# of color classes - not stored:\t" << sparse_hash_map_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm)
