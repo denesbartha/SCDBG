@@ -9,6 +9,7 @@
 #include <stxxl/vector>
 #include <sparsepp/spp.h>
 
+#include "utils.hpp"
 
 using namespace std;
 using spp::sparse_hash_map;
@@ -22,17 +23,6 @@ using spp::sparse_hash_map;
 // maximum number of colors
 #define MAXCOLORS   100u // 95146
 
-
-static inline uint8_t symbol_to_bits(const char c);
-
-static inline char bits_to_char(const uint8_t s);
-
-static inline uint8_t bits_to_id(const uint8_t s);
-
-static inline uint8_t id_to_bits(const uint8_t c);
-
-static inline uint8_t symbol_to_id(const char c);
-
 static const char base[5] = {'$', 'A', 'C', 'G', 'T'};
 
 
@@ -44,7 +34,7 @@ public:
 
     DeBrujinGraph(const uint8_t pkm, const uint32_t pc, const uint32_t psmd = 0) : km(pkm), kmer_bits(LOGSIGMA * pkm),
                                                                                    sampling_max_distance(psmd),
-                                                                                   C(pc) {
+                                                                                   num_of_colors(pc) {
         // kmer_bits = (uint16_t)LOGSIGMA * pkm;
 
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
@@ -54,38 +44,38 @@ public:
         }
     }
 
-    void process_read(const string &dna_str, const uint32_t color_id, bool phase_first);
+    void process_read(const string& dna_str, const uint32_t color_id, bool phase_first);
 
-    void gen_succinct_dbg(const string &fname);
+    void gen_succinct_dbg(const string& fname);
 
 private:
-    inline void add_new_node(const bitset<KMERBITS> &akmer, bool new_node, uint8_t pc);
+    inline void add_new_node(const bitset<KMERBITS>& akmer, bool new_node, uint8_t pc);
 
     void do_sampling();
 
     void sort_dbg();
 
-    void save_edge_list(ofstream &f);
+    void save_edge_list(ofstream& f);
 
-    void save_table_F(ofstream &f);
+    void save_table_F(ofstream& f);
 
-    void save_colors(const string &fname);
+    void save_colors(const string& fname);
 
-    void save_color_classes(ostream &f, const sparse_hash_map<bitset<MAXCOLORS>, size_t> &color_classes,
-                            const multimap<size_t, bitset<MAXCOLORS>> &ordered_cm);
+    void save_color_classes(ostream& f, const multimap<size_t, bitset<MAXCOLORS>>& ordered_cm,
+                            sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order);
 
-    void save_store_vector(ostream &f);
+    void save_store_vector(ostream& f);
 
-    void save_color_bit_vector(ostream &f, sparse_hash_map<bitset<MAXCOLORS>, size_t> &color_class_order,
-                                bool boundary);
+    void save_color_bit_vector(ostream& f, sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order,
+                               bool boundary);
 
 protected:
 
-    inline uint8_t outdegree(const bitset<SIGMA + 1> &ar);
+    inline uint8_t outdegree(const bitset<SIGMA + 1>& ar);
 
     inline uint8_t indegree(bitset<KMERBITS> pkmer);
 
-    inline bitset<MAXCOLORS> color_to_bitset(const Roaring &rc);
+    inline bitset<MAXCOLORS> color_to_bitset(const Roaring& rc);
 
     array<bitset<KMERBITS>, SIGMA + 1> shifted_sids;
 
@@ -101,7 +91,7 @@ protected:
     // number of edges
     size_t num_of_edges = 0;
     // number of colors
-    uint32_t C;
+    uint32_t num_of_colors;
 
 private:
     bool second_phase_started = false;

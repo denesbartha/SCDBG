@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
     // dbg.do_stats(dbg);
 
 
-    // DBGWrapper dbg(3, 1);
+    // DBGWrapper dbg(3, 2);
     // string dna_str1 = "TACGTCGACGACT";
     // string dna_str2 = "TACGCGACT";
     // // result:

@@ -160,7 +160,7 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
     cout << "k-mer size:\t\t\t" << (uint64_t) this->km << endl;
     cout << "# of nodes:\t\t\t" << num_of_nodes << endl;
     cout << "# of edges:\t\t\t" << this->num_of_edges << endl;
-    cout << "# of colors:\t\t\t" << (uint64_t) this->C << endl;
+    cout << "# of colors:\t\t\t" << (uint64_t) this->num_of_colors << endl;
     cout << "# of color classes:\t\t" << cm.size() << endl;
     cout << "# of color classes - not stored:\t" << sparse_hash_map_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm)
          << endl;
