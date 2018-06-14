@@ -51,19 +51,19 @@ int main(int argc, char *argv[]) {
     // dbg.do_stats(dbg);
 
 
-    // DBGWrapper dbg(3, 2);
-    // string dna_str1 = "TACGTCGACGACT";
-    // string dna_str2 = "TACGCGACT";
-    // // result:
-    // // TCCGTGGGACTAAA$C
-    // //  001111110111111    <-- B_F
-    // // 1110111100111111    <-- B_L
-    // dbg.process_read(dna_str1, 0, true);
-    // dbg.process_read(dna_str2, 1, true);
-    // dbg.process_read(dna_str1, 0, false);
-    // dbg.process_read(dna_str2, 1, false);
-    // dbg.do_stats();
-    // dbg.gen_succinct_dbg(argv[5]);
+    DBGWrapper dbg(3, 2);
+    string dna_str1 = "TACGTCGACGACT";
+    string dna_str2 = "TACGCGACT";
+    // result:
+    // TCCGTGGGACTAAA$C
+    //  001111110111111    <-- B_F
+    // 1110111100111111    <-- B_L
+    dbg.process_read(dna_str1, 0, true);
+    dbg.process_read(dna_str2, 1, true);
+    dbg.process_read(dna_str1, 0, false);
+    dbg.process_read(dna_str2, 1, false);
+    dbg.do_stats();
+    dbg.gen_succinct_dbg(argv[5]);
 
     CompressedDeBrujinGraph cdbg("compressed_dbg");
 

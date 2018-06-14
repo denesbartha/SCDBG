@@ -81,29 +81,37 @@ bool CompressedDeBrujinGraph::load_edge_list(std::ifstream& f) {
     }
 
     cerr << "Processing edge list..." << endl;
-    // put the edges into a wavelet tree
-    // edge_list.resize(num_of_edges);
+    char *buffer2 = new char[num_of_edges];
     size_t buffer_index = 0;
-    // for (size_t i = 0; i < num_of_edges; ++i) {
-    //     unsigned char ac = 0;
-    //     for (uint8_t j = 0; j < LOGSIGMA; ++j, ++buffer_index) {
-    //         ac |= buffer[buffer_index / 8] & (1 << (j + (buffer_index % 8)));
-    //     }
-    //     edge_list[i] = ac;
-    // }
-    // construct(edge_list, )
-    // reset_buffer(buffer);
-    // rank_support_il<1, 8>(edge_list);
+    for (size_t i = 0; i < num_of_edges; ++i) {
+        unsigned char ac = 0;
+        for (uint8_t j = 0; j < LOGSIGMA; ++j, ++buffer_index) {
+            // ac |= buffer[buffer_index / 8] & (1 << (j + (buffer_index % 8)));
+            ac |= ((buffer[buffer_index / 8] & (1 << (buffer_index % 8))) != 0) << j;
+        }
+        buffer2[i] = ac;
+    }
+    istringstream is(buffer2);
 
-    // sdsl::rrr_vector<3> rr;
-    // rank_support_rrr rs(rr);
+    // TODO: refactor this
+    ofstream f2("edge_list.tmp");
+    f2.write(buffer2, num_of_edges);
+    f2.close();
+    construct(edge_list, "edge_list.tmp", 1);
+    remove("edge_list.tmp");
+    reset_buffer(buffer);
+    reset_buffer(buffer2);
+
+    // for (auto a = 0; a < edge_list.size(); ++a) {
+    //     cout << edge_list.rank(a, 7) << endl;
+    // }
 
     return true;
 }
 
 
-bool CompressedDeBrujinGraph::load_BL_BF(std::ifstream& f, size_t length, sdsl::rank_support_rrr<>& rank_support,
-                                         sdsl::select_support_rrr<>& select_support_rrr) {
+bool CompressedDeBrujinGraph::load_BL_BF(std::ifstream& f, size_t length, sdsl::rank_support_v<>& rs,
+                                         sdsl::select_support_mcl<>& ss) {
     char *buffer = nullptr;
     load_from_file(f, buffer, length);
     if (buffer == nullptr) {
@@ -119,8 +127,9 @@ bool CompressedDeBrujinGraph::load_BL_BF(std::ifstream& f, size_t length, sdsl::
         bv[i] = (buffer[buffer_index / 8] & (1 << (buffer_index % 8))) != 0;
     }
     reset_buffer(buffer);
-    // rank_support_v<> rs(&bv);
-    // rank_support = rs;
+
+    rs = rank_support_v<>(&bv);
+    ss = select_support_mcl<>(&bv);
 
     return true;
 }

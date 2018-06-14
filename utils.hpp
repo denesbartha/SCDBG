@@ -146,8 +146,9 @@ inline size_t divide_and_to_upper(size_t a, size_t b) {
 
 
 inline void load_from_file(std::ifstream&f, char*& buffer, size_t length) {
-    buffer = new char [divide_and_to_upper(length, 8)];
-    f.read(buffer, length);
+    auto bytes = divide_and_to_upper(length, 8);
+    buffer = new char[bytes];
+    f.read(buffer, bytes);
 }
 
 inline void reset_buffer(char* buffer) {

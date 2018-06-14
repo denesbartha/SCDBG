@@ -24,12 +24,10 @@ void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t
                 akmer >>= LOGSIGMA;
                 akmer |= shifted_sids[sid];
                 add_new_node(akmer, false, sid);
-                ++num_of_edges;
             }
         }
         // the last edge leads to $
         dbg_kmers[akmer] |= 1;
-        ++num_of_edges;
     }
     else {
         // we will store the color for the outgoing edges of $$$...$
@@ -148,9 +146,8 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string &fname) {
     sort_dbg();
 
     ofstream f(fname + ".dbg", ios::out | ios::binary);
-    size_t dbg_size = dbg_kmers.size();
     // write the size of the DBG to the file
-    f.write(reinterpret_cast<const char *>(&dbg_size), sizeof(dbg_size));
+    f.write(reinterpret_cast<const char *>(&num_of_edges), sizeof(num_of_edges));
 
     save_edge_list(f);
     save_table_F(f);
@@ -348,6 +345,7 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         uint32_t outdeg = outdegree(dbg_kmers[it->first]);
+        num_of_edges += outdeg;
         if (!visited[it->first] && (outdeg > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
             // store the colours on each branching node...
             colors[it->first];
