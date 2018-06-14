@@ -1,5 +1,5 @@
-#ifndef SCDBG_UTILS_H
-#define SCDBG_UTILS_H
+#ifndef SCDBG_UTILS_HPP
+#define SCDBG_UTILS_HPP
 
 #include <ostream>
 #include <map>
@@ -139,4 +139,22 @@ inline void buffer_to_file(std::ostream& f, char *data_buffer, size_t size) {
     f.write(data_buffer, size);
 }
 
-#endif //SCDBG_UTILS_H
+
+inline size_t divide_and_to_upper(size_t a, size_t b) {
+    return a % b == 0 ? a / b : (a / b) + 1;
+}
+
+
+inline void load_from_file(std::ifstream&f, char*& buffer, size_t length) {
+    buffer = new char [divide_and_to_upper(length, 8)];
+    f.read(buffer, length);
+}
+
+inline void reset_buffer(char* buffer) {
+    if (buffer != nullptr) {
+        delete[] buffer;
+        buffer = nullptr;
+    }
+}
+
+#endif //SCDBG_UTILS_HPP

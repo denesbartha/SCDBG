@@ -147,7 +147,7 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string &fname) {
 
     sort_dbg();
 
-    ofstream f(fname, ios::out | ios::binary);
+    ofstream f(fname + ".dbg", ios::out | ios::binary);
     size_t dbg_size = dbg_kmers.size();
     // write the size of the DBG to the file
     f.write(reinterpret_cast<const char *>(&dbg_size), sizeof(dbg_size));
@@ -172,7 +172,7 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string &fname) {
             }
         }
         if (buffer_index > 0) {
-            buffer_to_file(f, data_buffer, (buffer_index % 8 == 0) ? buffer_index / 8 : (buffer_index / 8) + 1);
+            buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
         }
     };
 
@@ -210,30 +210,31 @@ void DeBrujinGraph<KMERBITS>::save_colors(const string &fname) {
     multimap<size_t, bitset<MAXCOLORS>> ordered_cm = flip_map(color_classes);
     color_classes.clear();
 
-    ofstream f(fname + ".colors", ios::out | ios::binary);
-    // write the size of the DBG to the file
-    size_t color_classes_size = ordered_cm.size();
-    f.write(reinterpret_cast<const char *>(&color_classes_size), sizeof(color_classes_size));
-
-    save_store_vector(f);
-
     sparse_hash_map<bitset<MAXCOLORS>, size_t> color_class_order;
-    save_color_classes(f, ordered_cm, color_class_order);
+    save_color_classes(fname, ordered_cm, color_class_order);
+
+    // create file for storing the bit vectors
+    ofstream f(fname + ".bit_vectors", ios::out | ios::binary);
+    save_store_vector(f);
 
     cerr << "Save label bit vector..." << endl;
     save_color_bit_vector(f, color_class_order, false);
 
     cerr << "Save boundary bit vector..." << endl;
     save_color_bit_vector(f, color_class_order, true);
-
     f.close();
 }
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::save_color_classes(ostream &f, const multimap<size_t, bitset<MAXCOLORS>> &ordered_cm,
+void DeBrujinGraph<KMERBITS>::save_color_classes(const string& fname, const multimap<size_t, bitset<MAXCOLORS>> &ordered_cm,
                                                  sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order) {
     cerr << "Save the color classes..." << endl;
+    ofstream f(fname + ".color_classes", ios::out | ios::binary);
+    // write the size of the DBG to the file
+    size_t color_classes_size = ordered_cm.size();
+    f.write(reinterpret_cast<const char *>(&color_classes_size), sizeof(color_classes_size));
+
     char data_buffer[MIN(800000, MAXCOLORS * 8000)] = {};
     size_t buffer_index = 0;
     // save the colour classes in reverse order (most used gets to the first place)
@@ -249,8 +250,9 @@ void DeBrujinGraph<KMERBITS>::save_color_classes(ostream &f, const multimap<size
         color_class_order[it->second] = i++;
     }
     if (buffer_index > 0) {
-        buffer_to_file(f, data_buffer, (buffer_index % 8 == 0) ? buffer_index / 8 : (buffer_index / 8) + 1);
+        buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
     }
+    f.close();
 }
 
 
@@ -288,7 +290,7 @@ void DeBrujinGraph<KMERBITS>::save_store_vector(ostream &f) {
         }
     }
     if (buffer_index > 0) {
-        buffer_to_file(f, data_buffer, (buffer_index % 8 == 0) ? buffer_index / 8 : (buffer_index / 8) + 1);
+        buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
     }
 }
 
@@ -320,7 +322,7 @@ void DeBrujinGraph<KMERBITS>::save_color_bit_vector(ostream &f,
         }
     }
     if (buffer_index > 0) {
-        buffer_to_file(f, data_buffer, (buffer_index % 8 == 0) ? buffer_index / 8 : (buffer_index / 8) + 1);
+        buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
     }
 }
 

@@ -10,20 +10,10 @@
 #include <sparsepp/spp.h>
 
 #include "utils.hpp"
+#include "config.h"
 
 using namespace std;
 using spp::sparse_hash_map;
-
-// SIGMA (for DNA, it is 4...)
-#define SIGMA       4u
-
-//log_2(SIGMA + 1)
-#define LOGSIGMA    3u
-
-// maximum number of colors
-#define MAXCOLORS   100u // 95146
-
-static const char base[5] = {'$', 'A', 'C', 'G', 'T'};
 
 
 template<uint16_t KMERBITS>
@@ -61,7 +51,7 @@ private:
 
     void save_colors(const string& fname);
 
-    void save_color_classes(ostream& f, const multimap<size_t, bitset<MAXCOLORS>>& ordered_cm,
+    void save_color_classes(const string& fname, const multimap<size_t, bitset<MAXCOLORS>>& ordered_cm,
                             sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order);
 
     void save_store_vector(ostream& f);
