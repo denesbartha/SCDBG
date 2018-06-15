@@ -17,11 +17,44 @@ public:
     CompressedDeBrujinGraph(const std::string& fname);
 
 private:
+    class BV {
+    public:
+        // BV(const sdsl::bit_vector& bv) : rs(&bv), ss(&bv) {}
+        //
+        // BV(const BV& bv) : rs(bv.rs), ss(bv.ss) {}
+
+        void resize(const size_t length) { bv.resize(length); }
+
+        sdsl::int_vector<1>::reference operator[](const size_t i) { return bv[i]; }
+
+        void init_support(const std::array<size_t, SIGMA>& F) {
+            sdsl::util::init_support(rs, &bv);
+            sdsl::util::init_support(ss, &bv);
+
+            for (auto i = 0; i < F.size(); ++i) {
+                F_rank[i] = rs.rank(F[i] + 1);
+            }
+        }
+
+        size_t rank(size_t i) const { return rs.rank(i); }
+
+        size_t select(size_t i) const { return ss.select(i); }
+
+        size_t size() const { return rs.size(); }
+
+    private:
+        sdsl::bit_vector bv;
+        sdsl::rank_support_v<> rs;
+        sdsl::select_support_mcl<> ss;
+        // culmulative sums of rank values for table F
+        std::array<size_t, SIGMA> F_rank = { };
+    } BL, BF;
+
     bool load_dbg(std::ifstream& f);
 
     bool load_edge_list(std::ifstream& f);
 
-    bool load_BL_BF(std::ifstream& f, size_t length, sdsl::rank_support_v<>& rs, sdsl::select_support_mcl<>& ss);
+    bool load_BL_BF(std::ifstream& f, size_t length, BV& bv);
 
     void load_bit_vectors(std::ifstream& f);
 
@@ -31,16 +64,8 @@ private:
     size_t num_of_nodes = 0;
     std::array<size_t, SIGMA> F = {};
     size_t num_of_color_classes = 0;
-    // sdsl::int_vector<8> edge_list;
     sdsl::wt_blcd<> edge_list;
-    // sdsl::bit_vector BL;
-    sdsl::rank_support_v<> BL_rs;
-    sdsl::select_support_rrr<> BL_ss;
-    // sdsl::bit_vector BF;
-    sdsl::rank_support_v<> BF_rs;
-    sdsl::select_support_mcl<> BF_ss;
     std::ifstream color_classes_file;
 };
-
 
 #endif //SCDBG_COMPRESSED_DBG_H

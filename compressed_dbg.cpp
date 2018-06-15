@@ -63,10 +63,20 @@ bool CompressedDeBrujinGraph::load_dbg(std::ifstream& f) {
 
     // load B_L
     cerr << "Loading bit vector B_L..." << endl;
-    load_BL_BF(f, num_of_edges, BL_rs, BF_ss);
+    load_BL_BF(f, num_of_edges, BL);
     // load B_F - note that it's size is (# of edges) - 1
     cerr << "Loading bit vector B_F..." << endl;
-    load_BL_BF(f, num_of_edges - 1, BF_rs, BF_ss);
+    load_BL_BF(f, num_of_edges - 1, BF);
+
+    // cout  << "size" << BL.size() << endl;
+    // for (auto i = 0; i < BL.size() + 1; ++i) {
+    //     cout << BL.rank(i) << " ";
+    // }
+    // cout << endl << BL.select(3) << endl;
+    // for (auto i = 0; i < BF.size() + 1; ++i) {
+    //     cout << BF.rank(i) << " ";
+    // }
+    // cout << endl;
 
     return true;
 }
@@ -87,7 +97,6 @@ bool CompressedDeBrujinGraph::load_edge_list(std::ifstream& f) {
     for (size_t i = 0; i < num_of_edges; ++i) {
         unsigned char ac = 0;
         for (uint8_t j = 0; j < LOGSIGMA; ++j, ++buffer_index) {
-            // ac |= buffer[buffer_index / 8] & (1 << (j + (buffer_index % 8)));
             ac |= ((buffer[buffer_index / 8] & (1 << (buffer_index % 8))) != 0) << j;
         }
         buffer2[i] = ac;
@@ -103,17 +112,11 @@ bool CompressedDeBrujinGraph::load_edge_list(std::ifstream& f) {
     reset_buffer(buffer);
     reset_buffer(buffer2);
 
-    // for (auto a = 0; a < edge_list.size() + 1; ++a) {
-    //     cout << edge_list.rank(a, 3) << endl;
-    // }
-    // cout << edge_list.select(1, 7) << endl;
-
     return true;
 }
 
 
-bool CompressedDeBrujinGraph::load_BL_BF(std::ifstream& f, size_t length, sdsl::rank_support_v<>& rs,
-                                         sdsl::select_support_mcl<>& ss) {
+bool CompressedDeBrujinGraph::load_BL_BF(std::ifstream& f, size_t length, BV& bv) {
     char *buffer = nullptr;
     load_from_file(f, buffer, length);
     if (buffer == nullptr) {
@@ -123,17 +126,16 @@ bool CompressedDeBrujinGraph::load_BL_BF(std::ifstream& f, size_t length, sdsl::
 
     cerr << "Processing edge list..." << endl;
     // put the edges into a wavelet tree
-    bit_vector bv(length, 0);
+    // bit_vector abv(length);
+    bv.resize(length);
     size_t buffer_index = 0;
     for (size_t i = 0; i < num_of_edges; ++i, ++buffer_index) {
         bv[i] = (buffer[buffer_index / 8] & (1 << (buffer_index % 8))) != 0;
-        cout << bv[i];
     }
     cout << endl;
     reset_buffer(buffer);
 
-    rs = rank_support_v<>(&bv);
-    ss = select_support_mcl<>(&bv);
+    bv.init_support(F);
 
     return true;
 }
@@ -147,8 +149,20 @@ void CompressedDeBrujinGraph::load_bit_vectors(ifstream& f) {
 
 size_t CompressedDeBrujinGraph::forward(size_t index) {
     // get the current character from L
+    auto ac = edge_list[index];
+    // if we read a $ => no more
+    if (ac == 0) {
+        return (size_t)-1;
+    }
     // get the rank of the character c
-    // find the next 1 in B_F - get the rank of this (extract the rank of the first c)
+    size_t char_rank = edge_list.rank(index, ac);
+    // find the character in F
+    auto cid = bits_to_id(ac);
+    size_t F_index = BF.select(F[cid - 1]);
+    // find the next 1 in B_F - get the rank of this (extract the rank of the first c in F)
+    size_t bf_rank = BF.rank(F_index + char_rank);
     // select the above calculated value in B_L => find the node's first position by reading 0s backward
+    auto node_index = BL.select(bf_rank + 1) + 1;
+    return node_index;
 }
 
