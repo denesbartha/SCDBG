@@ -99,16 +99,15 @@ void DeBrujinGraph<KMERBITS>::save_edge_list(ofstream &f) {
                     }
                     if ((++buffer_index / 8) >= sizeof(data_buffer)) {
                         // save_data(f, sizeof(data_buffer));
-                        f.write(data_buffer, sizeof(data_buffer));
-                        std::fill(data_buffer, data_buffer + sizeof(data_buffer), 0);
-                        buffer_index = 0;
+                        buffer_to_file(f, data_buffer, sizeof(data_buffer), buffer_index);
                     }
                 }
             }
         }
     }
     if (buffer_index > 0) {
-        f.write(data_buffer, buffer_index);
+        // f.write(data_buffer, buffer_index);
+        buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
     }
 }
 

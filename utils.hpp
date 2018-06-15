@@ -135,13 +135,13 @@ buffer_to_file(std::ostream& f, char *data_buffer, size_t size, size_t& buffer_i
 }
 
 
-inline void buffer_to_file(std::ostream& f, char *data_buffer, size_t size) {
-    f.write(data_buffer, size);
+inline size_t divide_and_to_upper(size_t a, size_t b) {
+    return a % b == 0 ? a / b : (a / b) + 1;
 }
 
 
-inline size_t divide_and_to_upper(size_t a, size_t b) {
-    return a % b == 0 ? a / b : (a / b) + 1;
+inline void buffer_to_file(std::ostream& f, char *data_buffer, size_t length) {
+    f.write(data_buffer, length);
 }
 
 

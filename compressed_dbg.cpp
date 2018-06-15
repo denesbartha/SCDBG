@@ -58,6 +58,7 @@ bool CompressedDeBrujinGraph::load_dbg(std::ifstream& f) {
     cerr << "Loading table F..." << endl;
     for (auto i = 0; i < SIGMA; ++i) {
         f.read(reinterpret_cast<char *>(&F[i]), sizeof(F[i]));
+        cout << F[i] << endl;
     }
 
     // load B_L
@@ -102,9 +103,10 @@ bool CompressedDeBrujinGraph::load_edge_list(std::ifstream& f) {
     reset_buffer(buffer);
     reset_buffer(buffer2);
 
-    // for (auto a = 0; a < edge_list.size(); ++a) {
-    //     cout << edge_list.rank(a, 7) << endl;
+    // for (auto a = 0; a < edge_list.size() + 1; ++a) {
+    //     cout << edge_list.rank(a, 3) << endl;
     // }
+    // cout << edge_list.select(1, 7) << endl;
 
     return true;
 }
@@ -125,7 +127,9 @@ bool CompressedDeBrujinGraph::load_BL_BF(std::ifstream& f, size_t length, sdsl::
     size_t buffer_index = 0;
     for (size_t i = 0; i < num_of_edges; ++i, ++buffer_index) {
         bv[i] = (buffer[buffer_index / 8] & (1 << (buffer_index % 8))) != 0;
+        cout << bv[i];
     }
+    cout << endl;
     reset_buffer(buffer);
 
     rs = rank_support_v<>(&bv);

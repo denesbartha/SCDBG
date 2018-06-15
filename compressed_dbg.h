@@ -21,8 +21,7 @@ private:
 
     bool load_edge_list(std::ifstream& f);
 
-    bool load_BL_BF(std::ifstream& f, size_t length, sdsl::rank_support_v<>& rs,
-                    sdsl::select_support_mcl<>& ss);
+    bool load_BL_BF(std::ifstream& f, size_t length, sdsl::rank_support_v<>& rs, sdsl::select_support_mcl<>& ss);
 
     void load_bit_vectors(std::ifstream& f);
 
