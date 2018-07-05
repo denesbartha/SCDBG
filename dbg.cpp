@@ -92,6 +92,7 @@ void DeBrujinGraph<KMERBITS>::save_edge_list(ofstream &f) {
     for (size_t i = 0; i < dbg_kmers_sorted.size(); ++i) {
         for (uint8_t j = 0; j < SIGMA + 1; ++j) {
             if (((1 << j) & dbg_kmers_sorted[i].second) != 0) {
+                // cout << base[j];
                 uint8_t ibits = id_to_bits(j);
                 for (uint8_t k = 0; k < LOGSIGMA; ++k) {
                     if ((1 << k) & ibits) {
@@ -339,7 +340,7 @@ static size_t sparse_hash_map_difference(const sparse_hash_map<KT, VT> &left, co
 template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::do_sampling() {
     // maximum distance without
-    uint32_t max_distance = max(sampling_max_distance, (uint32_t) log2(dbg_kmers.size()));
+    uint32_t max_distance = 1;//max(sampling_max_distance, (uint32_t) log2(dbg_kmers.size()));
     cerr << "Starting sampling process with max distance: " << max_distance << "..." << std::endl;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
@@ -419,8 +420,8 @@ inline uint8_t DeBrujinGraph<KMERBITS>::indegree(bitset<KMERBITS> pkmer) {
 template<uint16_t KMERBITS>
 inline bitset<MAXCOLORS> DeBrujinGraph<KMERBITS>::color_to_bitset(const Roaring &rc) {
     bitset<MAXCOLORS> acolor;
-    for (uint32_t j = 0; j < num_of_colors; ++j) {
-        acolor[j] = rc.contains(j);
+    for (auto it = rc.begin(); it != rc.end(); ++it) {
+        acolor.set(*it);
     }
     return acolor;
 }
