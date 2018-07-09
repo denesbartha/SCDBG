@@ -340,13 +340,13 @@ static size_t sparse_hash_map_difference(const sparse_hash_map<KT, VT> &left, co
 template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::do_sampling() {
     // maximum distance without
-    uint32_t max_distance = 1;//max(sampling_max_distance, (uint32_t) log2(dbg_kmers.size()));
+    uint32_t max_distance = max(sampling_max_distance, (uint32_t) log2(dbg_kmers.size()));
     cerr << "Starting sampling process with max distance: " << max_distance << "..." << std::endl;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         uint32_t outdeg = outdegree(dbg_kmers[it->first]);
         num_of_edges += outdeg;
-        if (!visited[it->first] && (outdeg > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
+        if (!visited[it->first] && ((outdeg > 1) || indegree(it->first) > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
             // store the colours on each branching node...
             colors[it->first];
             explicitly_stored_colors += outdeg;

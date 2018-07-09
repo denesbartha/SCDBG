@@ -22,6 +22,9 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
 
     sparse_hash_map<bitset<MAXCOLORS>, size_t> cm;
     sparse_hash_map<bitset<MAXCOLORS>, size_t> cm_rest;
+    sparse_hash_map<bitset<MAXCOLORS>, bool> cm_all;
+    size_t cm_color_class_sizes = 0;
+    size_t cm_rest_color_class_sizes = 0;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     sparse_hash_map<size_t, size_t> paths;
     for (auto it = this->dbg_kmers.cbegin(); it != this->dbg_kmers.cend(); ++it) {
@@ -72,7 +75,7 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
                            this->outdegree(this->dbg_kmers[akmer]) == 1) {
                         // && this->indegree(akmer) == 1
                         visited[akmer] = 1;
-                        auto &anode = this->dbg_kmers[akmer];
+                        auto& anode = this->dbg_kmers[akmer];
                         for (uint8_t j = 0; j < SIGMA + 1; ++j) {
                             if (((1 << j) & anode) != 0) {
                                 akmer >>= LOGSIGMA;
@@ -108,29 +111,26 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
                 for (uint8_t i = 0; i < SIGMA + 1; ++i) {
                     if (((1 << i) & it->second) != 0) {
                         auto ac = this->colors[it->first][i];
-                        cm[this->color_to_bitset(ac)]++;
-                        if (!first_node) {
-                            color_is_the_same &= prev_color == ac;
+                        auto acolor = this->color_to_bitset(ac);
+                        cm[acolor]++;
+                        if (cm_all.find(acolor) == cm_all.end()) {
+                            cm_color_class_sizes += ac.cardinality();
+                            cm_all[acolor];
                         }
-                        prev_color = ac;
-                        first_node = false;
-                        // if (ac == current_node_color) {
-                        //     color_is_the_same_as_incoming++;
-                        // }
-                        // branching_outdegrees_sum++;
                     }
-                }
-                if (color_is_the_same) {
-                    branching_color_is_the_same[ocnt]++;
                 }
                 branching_outdegrees[ocnt]++;
             }
             else if (icnt > 1) {
-                // cm_rest[this->color_to_bitset(get_color(it->first))]++;
                 for (uint8_t i = 0; i < SIGMA + 1; ++i) {
                     if (((1 << i) & it->second) != 0) {
                         auto ac = this->colors[it->first][i];
-                        cm_rest[this->color_to_bitset(ac)]++;
+                        auto acolor = this->color_to_bitset(ac);
+                        cm_rest[acolor]++;
+                        if (cm_all.find(acolor) == cm_all.end()) {
+                            cm_rest_color_class_sizes += ac.cardinality();
+                            cm_all[acolor];
+                        }
                     }
                 }
             }
@@ -162,15 +162,21 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
     cout << "# of edges:\t\t\t" << this->num_of_edges << endl;
     cout << "# of colors:\t\t\t" << (uint64_t) this->num_of_colors << endl;
     cout << "# of color classes:\t\t" << cm.size() << endl;
-    cout << "# of color classes - not stored:\t" << sparse_hash_map_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm)
-         << endl;
+    size_t not_stored_color_classes_cnt = sparse_hash_map_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm);
+    cout << "# of color classes - not stored:\t" << not_stored_color_classes_cnt << endl;
     for (uint8_t i = 2; i <= SIGMA + 1; ++i) {
         cout << "# of B_{*," << (int) i << "} nodes, where the color is the same:\t" << branching_color_is_the_same[i]
              << "/" << branching_outdegrees[i] << endl;
     }
     // cout << "# of B_{*,+} nodes, where the outgoing color is the same as the node's color: "
     //      << color_is_the_same_as_incoming << "/" << branching_outdegrees_sum << endl;
-    cout << "# of explicitly stored this->colors:\t" << this->explicitly_stored_colors << endl;
+
+    // explicitly_stored_colors - shows that how many places did we store labels
+    cout << "# of explicitly stored color labels:\t" << this->explicitly_stored_colors << endl;
+    cout << "color class sizes - stored:\t" << cm_color_class_sizes << "\t average:"
+         << (cm_color_class_sizes / (float) cm.size()) << endl;
+    cout << "color class sizes - not stored:\t" << cm_rest_color_class_sizes << "\t average:"
+         << (cm_rest_color_class_sizes / (float) not_stored_color_classes_cnt) << endl;
     cout << "#source nodes:\t\t\t" << source << "\t\t\t" << (float) source / num_of_nodes << "%" << endl;
     cout << "#sink nodes:\t\t\t" << sink << "\t\t\t" << (float) sink / num_of_nodes << "%" << endl;
     cout << "#in, out = 1:\t\t\t" << in_out_one << "\t\t\t" << (float) in_out_one / num_of_nodes << "%"
@@ -213,7 +219,7 @@ string DeBrujinGraphStats<KMERBITS>::kmer_to_str(bitset<KMERBITS> kmer_str) {
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraphStats<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint64_t icnt, uint64_t ocnt) {
+void DeBrujinGraphStats<KMERBITS>::print_node(const bitset<KMERBITS>& str, uint64_t icnt, uint64_t ocnt) {
     static const bitset<KMERBITS> mask(string(this->kmer_bits, '1'));
     cerr << bitset<KMERBITS>(str).to_string() << endl << kmer_to_str(str) << endl;
 
@@ -235,7 +241,7 @@ void DeBrujinGraphStats<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint6
 
     // print the out edges
     cout << endl << "out edges: ";
-    const auto &anode = this->dbg_kmers[str];
+    const auto& anode = this->dbg_kmers[str];
     for (int i = 0; i < SIGMA + 1; ++i) {
         if (((1 << i) & anode) != 0) {
             cout << base[i] << " ";
@@ -269,7 +275,7 @@ void DeBrujinGraphStats<KMERBITS>::print_node(const bitset<KMERBITS> &str, uint6
 
 // Returns the colour of a given node
 template<uint16_t KMERBITS>
-inline Roaring DeBrujinGraphStats<KMERBITS>::get_color(const bitset<KMERBITS> &pkmer) {
+inline Roaring DeBrujinGraphStats<KMERBITS>::get_color(const bitset<KMERBITS>& pkmer) {
     static const bitset<KMERBITS> mask(string(this->kmer_bits, '1'));
     Roaring rcolor;
     deque<bitset<KMERBITS>> kmer_queue(1, pkmer);
