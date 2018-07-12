@@ -1,12 +1,13 @@
 #include <deque>
 #include <sstream>
 #include <algorithm>
+#include <sdsl/bit_vectors.hpp>
 
 #include "dbg.h"
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t color_id, bool phase_first) {
+void DeBrujinGraph<KMERBITS>::process_read(const string& dna_str, const uint32_t color_id, bool phase_first) {
     // the first KMER-sized substring will be $$$...$
     bitset<KMERBITS> akmer = 0, pkmer = 0;
 
@@ -43,13 +44,15 @@ void DeBrujinGraph<KMERBITS>::process_read(const string &dna_str, const uint32_t
                 pkmer = akmer;
             }
         }
-        // colors[pkmer][0].add(color_id);
+        if (colors.find(pkmer) != colors.end()) {
+            colors[pkmer][0].add(color_id);
+        }
     }
 }
 
 
 template<uint16_t KMERBITS>
-inline void DeBrujinGraph<KMERBITS>::add_new_node(const bitset<KMERBITS> &akmer, bool new_node, uint8_t pc) {
+inline void DeBrujinGraph<KMERBITS>::add_new_node(const bitset<KMERBITS>& akmer, bool new_node, uint8_t pc) {
     static bitset<KMERBITS> pkmer;
     if (!new_node) {
         dbg_kmers[pkmer] |= 1 << pc;
@@ -67,12 +70,13 @@ void DeBrujinGraph<KMERBITS>::sort_dbg() {
     cerr << "Sorting edge list..." << endl;
 
     dbg_kmers_sorted.resize(dbg_kmers.size());
-    for (auto it = dbg_kmers.cbegin(), i = 0; it != dbg_kmers.end(); ++it, ++i) {
+    size_t i = 0;
+    for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.end(); ++it, ++i) {
         dbg_kmers_sorted[i] = make_pair(it->first, it->second);
     }
 
     std::sort(dbg_kmers_sorted.begin(), dbg_kmers_sorted.end(),
-              [this](const pair<bitset<KMERBITS>, uint8_t> &a, const pair<bitset<KMERBITS>, uint8_t> &b) -> bool {
+              [this](const pair<bitset<KMERBITS>, uint8_t>& a, const pair<bitset<KMERBITS>, uint8_t>& b) -> bool {
                   for (int i = kmer_bits - 1; i >= 0; --i) {
                       if (a.first[i] ^ b.first[i]) {
                           return b.first[i];
@@ -84,7 +88,7 @@ void DeBrujinGraph<KMERBITS>::sort_dbg() {
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::save_edge_list(ofstream &f) {
+void DeBrujinGraph<KMERBITS>::save_edge_list(ofstream& f) {
     cerr << "Saving edge list to file..." << endl;
 
     char data_buffer[LOGSIGMA * 8000] = {};
@@ -114,7 +118,7 @@ void DeBrujinGraph<KMERBITS>::save_edge_list(ofstream &f) {
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::save_table_F(ofstream &f) {
+void DeBrujinGraph<KMERBITS>::save_table_F(ofstream& f) {
     static const bitset<KMERBITS> mask(string(LOGSIGMA, '1'));
     cerr << "Saving table F to file..." << endl;
 
@@ -140,7 +144,7 @@ void DeBrujinGraph<KMERBITS>::save_table_F(ofstream &f) {
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string &fname) {
+void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string& fname) {
     cerr << "Generating Succinct De Bruijn Graph..." << endl;
 
     sort_dbg();
@@ -186,9 +190,10 @@ void DeBrujinGraph<KMERBITS>::gen_succinct_dbg(const string &fname) {
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::save_colors(const string &fname) {
+void DeBrujinGraph<KMERBITS>::save_colors(const string& fname) {
     cerr << "Generate color classes..." << endl;
     sparse_hash_map<bitset<MAXCOLORS>, size_t> color_classes;
+    size_t set_bits = 0;
     for (auto it = dbg_kmers_sorted.cbegin(); it != dbg_kmers_sorted.cend(); ++it) {
         // if we are on a branching node (B_{1,+} or B_{+,+})
         if (colors.find(it->first) != colors.end()) { // && outdegree(dbg_kmers[it->first]) > 1
@@ -196,7 +201,11 @@ void DeBrujinGraph<KMERBITS>::save_colors(const string &fname) {
             for (uint8_t i = 0; i < SIGMA + 1; ++i) {
                 if (((1 << i) & it->second) != 0) {
                     auto ac = colors[it->first][i];
-                    color_classes[color_to_bitset(ac)]++;
+                    auto color_bits = color_to_bitset(ac);
+                    if (color_classes.find(color_bits) == color_classes.end()) {
+                        set_bits += ac.cardinality();
+                    }
+                    color_classes[color_bits]++;
                 }
             }
         }
@@ -208,53 +217,70 @@ void DeBrujinGraph<KMERBITS>::save_colors(const string &fname) {
     color_classes.clear();
 
     sparse_hash_map<bitset<MAXCOLORS>, size_t> color_class_order;
-    save_color_classes(fname, ordered_cm, color_class_order);
+    save_color_classes(fname, ordered_cm, color_class_order, set_bits);
 
     // create file for storing the bit vectors
     ofstream f(fname + ".bit_vectors", ios::out | ios::binary);
     save_store_vector(f);
 
-    cerr << "Save label bit vector..." << endl;
+    cerr << "Saving label bit vector..." << endl;
     save_color_bit_vector(f, color_class_order, false);
 
-    cerr << "Save boundary bit vector..." << endl;
+    cerr << "Saving boundary bit vector..." << endl;
     save_color_bit_vector(f, color_class_order, true);
     f.close();
 }
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::save_color_classes(const string& fname, const multimap<size_t, bitset<MAXCOLORS>> &ordered_cm,
-                                                 sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order) {
-    cerr << "Save the color classes..." << endl;
-    ofstream f(fname + ".color_classes", ios::out | ios::binary);
-    // write the size of the DBG to the file
-    size_t color_classes_size = ordered_cm.size();
-    f.write(reinterpret_cast<const char *>(&color_classes_size), sizeof(color_classes_size));
-
-    char data_buffer[MIN(800000, MAXCOLORS * 8000)] = {};
-    size_t buffer_index = 0;
-    // save the colour classes in reverse order (most used gets to the first place)
+void
+DeBrujinGraph<KMERBITS>::save_color_classes(const string& fname, const multimap<size_t, bitset<MAXCOLORS>>& ordered_cm,
+                                            sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order,
+                                            size_t set_bits) {
+    cerr << "Saving color classes..." << endl;
+    auto vector_builder = new sdsl::sd_vector_builder(ordered_cm.size() * num_of_colors, set_bits);
     size_t i = 0;
     for (auto it = ordered_cm.rbegin(); it != ordered_cm.rend(); ++it) {
         for (size_t j = 0; j < num_of_colors; ++j) {
-            data_buffer[buffer_index / 8] |= ((it->second[j]) << (buffer_index % 8));
-            if ((++buffer_index / 8) >= sizeof(data_buffer)) {
-                buffer_to_file(f, data_buffer, sizeof(data_buffer), buffer_index);
+            if (it->second[j]) {
+                vector_builder->set(i * num_of_colors + j);
             }
         }
-        // store the color class's index
         color_class_order[it->second] = i++;
     }
-    if (buffer_index > 0) {
-        buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
-    }
-    f.close();
+
+    sdsl::sd_vector<> color_matrix(*vector_builder);
+    sdsl::store_to_file(color_matrix, fname + ".color_classes");
+    delete vector_builder;
+
+    // ofstream f(fname + ".color_classes", ios::out | ios::binary);
+    // // write the size of the DBG to the file
+    // size_t color_classes_size = ordered_cm.size();
+    // f.write(reinterpret_cast<const char *>(&color_classes_size), sizeof(color_classes_size));
+    //
+    // char data_buffer[MIN(800000, MAXCOLORS * 8000)] = {};
+    // size_t buffer_index = 0;
+    // // save the colour classes in reverse order (most used gets to the first place)
+    // size_t i = 0;
+    // for (auto it = ordered_cm.rbegin(); it != ordered_cm.rend(); ++it) {
+    //     for (size_t j = 0; j < num_of_colors; ++j) {
+    //         data_buffer[buffer_index / 8] |= ((it->second[j]) << (buffer_index % 8));
+    //         if ((++buffer_index / 8) >= sizeof(data_buffer)) {
+    //             buffer_to_file(f, data_buffer, sizeof(data_buffer), buffer_index);
+    //         }
+    //     }
+    //     // store the color class's index
+    //     color_class_order[it->second] = i++;
+    // }
+    // if (buffer_index > 0) {
+    //     buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
+    // }
+    // f.close();
 }
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::save_store_vector(ostream &f) {
+void DeBrujinGraph<KMERBITS>::save_store_vector(ostream& f) {
     bool sampling = sampling_max_distance > 0;
     // write to file true iff there was sampling, false otherwise
     f.write(reinterpret_cast<const char *>(&sampling), sizeof(sampling));
@@ -293,8 +319,8 @@ void DeBrujinGraph<KMERBITS>::save_store_vector(ostream &f) {
 
 
 template<uint16_t KMERBITS>
-void DeBrujinGraph<KMERBITS>::save_color_bit_vector(ostream &f,
-                                                    sparse_hash_map<bitset<MAXCOLORS>, size_t> &color_class_order,
+void DeBrujinGraph<KMERBITS>::save_color_bit_vector(ostream& f,
+                                                    sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order,
                                                     bool boundary) {
     char data_buffer[MIN(800000, MAXCOLORS * 8000)] = {};
     size_t buffer_index = 0;
@@ -325,7 +351,7 @@ void DeBrujinGraph<KMERBITS>::save_color_bit_vector(ostream &f,
 
 
 template<typename KT, typename VT>
-static size_t sparse_hash_map_difference(const sparse_hash_map<KT, VT> &left, const sparse_hash_map<KT, VT> &right) {
+static size_t sparse_hash_map_difference(const sparse_hash_map<KT, VT>& left, const sparse_hash_map<KT, VT>& right) {
     size_t s = 0;
     for (auto it = left.cbegin(); it != left.cend(); ++it) {
         if (right.find(it->first) == right.end()) {
@@ -346,7 +372,8 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         uint32_t outdeg = outdegree(dbg_kmers[it->first]);
         num_of_edges += outdeg;
-        if (!visited[it->first] && ((outdeg > 1) || indegree(it->first) > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
+        if (!visited[it->first] &&
+            ((outdeg > 1) || indegree(it->first) > 1)) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
             // store the colours on each branching node...
             colors[it->first];
             explicitly_stored_colors += outdeg;
@@ -363,7 +390,7 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
                         while (dbg_kmers.find(akmer) != dbg_kmers.end() && outdegree(dbg_kmers[akmer]) == 1) {
                             // && indegree(akmer) == 1
                             visited[akmer] = 1;
-                            auto &anode = dbg_kmers[akmer];
+                            auto& anode = dbg_kmers[akmer];
                             for (uint8_t j = 0; j < SIGMA + 1; ++j) {
                                 if (((1 << j) & anode) != 0) {
                                     akmer >>= LOGSIGMA;
@@ -389,7 +416,7 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
 
 
 template<uint16_t KMERBITS>
-inline uint8_t DeBrujinGraph<KMERBITS>::outdegree(const bitset<SIGMA + 1> &ar) {
+inline uint8_t DeBrujinGraph<KMERBITS>::outdegree(const bitset<SIGMA + 1>& ar) {
     uint8_t s = 0;
     for (uint8_t i = 0; i < SIGMA + 1; ++i) {
         s += ar[i];
@@ -418,7 +445,7 @@ inline uint8_t DeBrujinGraph<KMERBITS>::indegree(bitset<KMERBITS> pkmer) {
 
 
 template<uint16_t KMERBITS>
-inline bitset<MAXCOLORS> DeBrujinGraph<KMERBITS>::color_to_bitset(const Roaring &rc) {
+inline bitset<MAXCOLORS> DeBrujinGraph<KMERBITS>::color_to_bitset(const Roaring& rc) {
     bitset<MAXCOLORS> acolor;
     for (auto it = rc.begin(); it != rc.end(); ++it) {
         acolor.set(*it);

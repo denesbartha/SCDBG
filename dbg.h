@@ -52,7 +52,7 @@ private:
     void save_colors(const string& fname);
 
     void save_color_classes(const string& fname, const multimap<size_t, bitset<MAXCOLORS>>& ordered_cm,
-                            sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order);
+                            sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order, size_t set_bits);
 
     void save_store_vector(ostream& f);
 
