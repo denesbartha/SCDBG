@@ -20,7 +20,7 @@ template<uint16_t KMERBITS>
 class DeBrujinGraph {
 public:
 
-    DeBrujinGraph() : DeBrujinGraph(32, 10, -1) {}
+    DeBrujinGraph() : DeBrujinGraph(32, 10, 0) {}
 
     DeBrujinGraph(const uint8_t pkm, const uint32_t pc, const uint32_t psmd = 0) : km(pkm), kmer_bits(LOGSIGMA * pkm),
                                                                                    sampling_max_distance(psmd),
@@ -52,11 +52,12 @@ private:
     void save_colors(const string& fname);
 
     void save_color_classes(const string& fname, const multimap<size_t, bitset<MAXCOLORS>>& ordered_cm,
-                            sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order, size_t set_bits);
+                            sparse_hash_map<bitset<MAXCOLORS>, pair<size_t, uint8_t>>& color_class_order,
+                            size_t set_bits);
 
     void save_store_vector(ostream& f);
 
-    void save_color_bit_vector(ostream& f, sparse_hash_map<bitset<MAXCOLORS>, size_t>& color_class_order,
+    void save_color_bit_vector(ostream& f, sparse_hash_map<bitset<MAXCOLORS>, pair<size_t, uint8_t>>& color_class_order,
                                bool boundary);
 
 protected:
@@ -65,7 +66,11 @@ protected:
 
     inline uint8_t indegree(bitset<KMERBITS> pkmer);
 
-    inline bitset<MAXCOLORS> color_to_bitset(const Roaring& rc);
+    // inline bitset<MAXCOLORS> color_to_bitset(const Roaring& rc);
+
+    inline void add_color(size_t& kmer_color_hash, const uint32_t color_id);
+
+    inline size_t add_color_class(const bitset<MAXCOLORS>& bitvector);
 
     array<bitset<KMERBITS>, SIGMA + 1> shifted_sids;
 
@@ -75,12 +80,24 @@ protected:
     size_t explicitly_stored_colors = 0;
 
     sparse_hash_map<bitset<KMERBITS>, uint8_t> dbg_kmers;
-    sparse_hash_map<bitset<KMERBITS>, array<Roaring, SIGMA + 1>> colors;
-    // map<bitset<KMERBITS>, uint8_t, compare_lexicographically<KMERBITS>> dbg_kmers;
 
-    // number of edges
+    sparse_hash_map<bitset<KMERBITS>, array<size_t, SIGMA + 1>> colors;
+
+    struct color_class_t {
+        color_class_t() {}
+
+        color_class_t(const bitset<MAXCOLORS>& pbitvector) : bitvector(pbitvector) {}
+
+        bitset<MAXCOLORS> bitvector;
+        size_t cnt = 0;
+    };
+
+    sparse_hash_map<uint64_t, color_class_t> color_classes;
+    hash<bitset<MAXCOLORS>> hash_color_class;
+    hash<size_t> hash_int;
+    size_t set_bits = 0;
+
     size_t num_of_edges = 0;
-    // number of colors
     uint32_t num_of_colors;
 
 private:
@@ -88,18 +105,8 @@ private:
 
     typedef typename stxxl::VECTOR_GENERATOR<pair<bitset<KMERBITS>, uint8_t>>::result dbg_kmer_vector_type;
     dbg_kmer_vector_type dbg_kmers_sorted;
+    // vector<pair<bitset<KMERBITS>, uint8_t>> dbg_kmers_sorted;
 
-    // Roaring64Map dbg_kmers;
-    // bitset_wrapper<T, BitSetClass, Iterator_Type> dbg_kmers;
-
-    // typedef typename stxxl::VECTOR_GENERATOR<bitset<SIGMA + 1>>::result vector;
-    // typedef typename vector<bitset<SIGMA + 1>> vector;
-    // vector nodes_outgoing;
-
-    // typedef typename stxxl::VECTOR_GENERATOR<array<Roaring, SIGMA + 1>>::result color_vector_type;
-    // color_vector_type colors;
-
-    // vector<array<Roaring, SIGMA + 1>> colors;
 };
 
 

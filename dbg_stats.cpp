@@ -20,11 +20,13 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
     // uint64_t color_is_the_same_as_incoming = 0;
     // uint64_t branching_outdegrees_sum = 0;
 
-    sparse_hash_map<bitset<MAXCOLORS>, size_t> cm;
-    sparse_hash_map<bitset<MAXCOLORS>, size_t> cm_rest;
-    sparse_hash_map<bitset<MAXCOLORS>, bool> cm_all;
+    // sparse_hash_map<bitset<MAXCOLORS>, size_t> cm;
+    // sparse_hash_map<bitset<MAXCOLORS>, size_t> cm_rest;
+    // sparse_hash_map<bitset<MAXCOLORS>, bool> cm_all;
     size_t cm_color_class_sizes = 0;
     size_t cm_rest_color_class_sizes = 0;
+    sparse_hash_map<size_t, uint8_t> cm;
+    sparse_hash_map<size_t, uint8_t> cm_rest;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     sparse_hash_map<size_t, size_t> paths;
     for (auto it = this->dbg_kmers.cbegin(); it != this->dbg_kmers.cend(); ++it) {
@@ -105,36 +107,28 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
         if (this->colors.find(it->first) != this->colors.end()) {
             if (ocnt > 1) {
                 // auto current_node_color = get_color(it->first);
-                Roaring prev_color;
-                bool first_node = true;
-                bool color_is_the_same = true;
+                // Roaring prev_color;
                 for (uint8_t i = 0; i < SIGMA + 1; ++i) {
                     if (((1 << i) & it->second) != 0) {
                         auto ac = this->colors[it->first][i];
-                        auto acolor = this->color_to_bitset(ac);
-                        cm[acolor]++;
-                        if (cm_all.find(acolor) == cm_all.end()) {
-                            cm_color_class_sizes += ac.cardinality();
-                            cm_all[acolor];
+                        if (cm.find(ac) == cm.end()) {
+                            cm_color_class_sizes += this->color_classes[ac].bitvector.count();
+                            cm[ac];
                         }
+
+                        // auto acolor = this->color_to_bitset(ac);
+                        // cm[acolor]++;
+                        // if (cm_all.find(acolor) == cm_all.end()) {
+                        //     cm_color_class_sizes += ac.cardinality();
+                        //     cm_all[acolor];
+                        // }
                     }
                 }
                 branching_outdegrees[ocnt]++;
             }
-            else if (icnt > 1) {
-                for (uint8_t i = 0; i < SIGMA + 1; ++i) {
-                    if (((1 << i) & it->second) != 0) {
-                        auto ac = this->colors[it->first][i];
-                        auto acolor = this->color_to_bitset(ac);
-                        cm_rest[acolor]++;
-                        if (cm_all.find(acolor) == cm_all.end()) {
-                            cm_rest_color_class_sizes += ac.cardinality();
-                            cm_all[acolor];
-                        }
-                    }
-                }
-            }
         }
+
+
         // else if (icnt > 1 || ocnt > 1) {
         //     cm_rest[this->color_to_bitset(get_color(it->first))]++;
         //
@@ -142,6 +136,29 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
         //
         //     }
         // }
+    }
+
+    for (auto it = this->dbg_kmers.cbegin(); it != this->dbg_kmers.cend(); ++it) {
+        uint64_t icnt = this->indegree(it->first);
+        if (this->colors.find(it->first) != this->colors.end()) {
+            if (icnt > 1) {
+                for (uint8_t i = 0; i < SIGMA + 1; ++i) {
+                    if (((1 << i) & it->second) != 0) {
+                        auto ac = this->colors[it->first][i];
+                        if (cm.find(ac) == cm.end() && cm_rest.find(ac) == cm_rest.end()) {
+                            cm_rest_color_class_sizes += this->color_classes[ac].bitvector.count();
+                            cm_rest[ac];
+                        }
+                        // auto acolor = this->color_to_bitset(ac);
+                        // cm_rest[acolor]++;
+                        // if (cm_all.find(acolor) == cm_all.end()) {
+                        //     cm_rest_color_class_sizes += ac.cardinality();
+                        //     cm_all[acolor];
+                        // }
+                    }
+                }
+            }
+        }
     }
 
 
@@ -162,7 +179,8 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
     cout << "# of edges:\t\t\t" << this->num_of_edges << endl;
     cout << "# of colors:\t\t\t" << (uint64_t) this->num_of_colors << endl;
     cout << "# of color classes:\t\t" << cm.size() << endl;
-    size_t not_stored_color_classes_cnt = sparse_hash_map_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm);
+    // size_t not_stored_color_classes_cnt = sparse_hash_map_difference<bitset<MAXCOLORS>, size_t>(cm_rest, cm);
+    size_t not_stored_color_classes_cnt = this->color_classes.size() - cm.size();
     cout << "# of color classes - not stored:\t" << not_stored_color_classes_cnt << endl;
     for (uint8_t i = 2; i <= SIGMA + 1; ++i) {
         cout << "# of B_{*," << (int) i << "} nodes, where the color is the same:\t" << branching_color_is_the_same[i]
