@@ -12,7 +12,6 @@ public:
     void do_stats();
 
 private:
-    string kmer_to_str(bitset<KMERBITS> kmer_str);
 
     void print_node(const bitset<KMERBITS> &str, uint64_t icnt, uint64_t ocnt);
 

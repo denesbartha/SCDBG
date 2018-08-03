@@ -33,23 +33,23 @@ void DeBrujinGraph<KMERBITS>::process_read(const string& dna_str, const uint32_t
     }
     else {
         // we will store the color for the outgoing edges of $$$...$
-        colors[akmer];
+        // colors[akmer];
         for (uint64_t i = 0, sl = dna_str.length(); i < sl; ++i) {
             uint8_t sid = symbol_to_id(dna_str[i]);
             if (sid != 255) {
                 akmer >>= LOGSIGMA;
                 akmer |= shifted_sids[sid];
-                if (colors.find(pkmer) != colors.end()) {
+                if (colors.find(pkmer) != colors.end()) { // && indegree(akmer) > 1
                     // colors[pkmer][sid].add(color_id);
                     add_color(colors[pkmer][sid], color_id);
                 }
                 pkmer = akmer;
             }
         }
-        if (colors.find(pkmer) != colors.end()) {
+        // if (colors.find(pkmer) != colors.end()) {
             // colors[pkmer][0].add(color_id);
             add_color(colors[pkmer][0], color_id);
-        }
+        // }
     }
 }
 
@@ -139,9 +139,10 @@ void DeBrujinGraph<KMERBITS>::save_edge_list(ofstream& f) {
     char data_buffer[LOGSIGMA * 8000] = {};
     size_t buffer_index = 0;
     for (size_t i = 0; i < dbg_kmers_sorted.size(); ++i) {
+        // cout << kmer_to_str(dbg_kmers_sorted[i].first);
         for (uint8_t j = 0; j < SIGMA + 1; ++j) {
             if (((1 << j) & dbg_kmers_sorted[i].second) != 0) {
-                // cout << base[j];
+                // cout << base[j] << endl;
                 uint8_t ibits = id_to_bits(j);
                 for (uint8_t k = 0; k < LOGSIGMA; ++k) {
                     if ((1 << k) & ibits) {
@@ -308,10 +309,10 @@ void DeBrujinGraph<KMERBITS>::save_store_vector(ostream& f) {
     size_t buffer_index = 0;
     for (auto it = dbg_kmers_sorted.cbegin(); it != dbg_kmers_sorted.cend(); ++it) {
         // if we are on a branching node (B_{1,+} or B_{+,+})
-        if (colors.find(it->first) != colors.end() && outdegree(dbg_kmers[it->first]) > 1) {
+        if (colors.find(it->first) != colors.end()) { // && outdegree(dbg_kmers[it->first]) > 1
             // go through the outgoing edges
             for (uint8_t i = 0; i < SIGMA + 1; ++i) {
-                if (((1 << i) & it->second) != 0) {
+                if (((1 << i) & it->second) != 0 && colors[it->first][i] != 0) {
                     data_buffer[buffer_index / 8] |= 1 << (buffer_index % 8);
                     if ((++buffer_index / 8) >= sizeof(data_buffer)) {
                         buffer_to_file(f, data_buffer, sizeof(data_buffer), buffer_index);
@@ -343,18 +344,22 @@ void DeBrujinGraph<KMERBITS>::save_color_bit_vector(ostream& f,
         if (colors.find(it->first) != colors.end()) { // && outdegree(dbg_kmers[it->first]) > 1
             // go through the outgoing edges
             for (uint8_t i = 0; i < SIGMA + 1; ++i) {
-                if (((1 << i) & it->second) != 0) {
+                if (((1 << i) & it->second) != 0 && colors[it->first][i] != 0) {
+
                     auto ac = colors[it->first][i];
                     auto order_data = color_class_order[color_classes[ac].bitvector];
                     // auto index = order.first; // color_class_order[color_to_bitset(ac)];
                     auto number_of_bits = order_data.second;
                     size_t data = boundary ? 1 << (number_of_bits - 1) : order_data.first;
+                    cout << kmer_to_str(it->first) << base[i] << " ";
                     for (uint8_t j = 0; j < number_of_bits; ++j) {
-                        data_buffer[buffer_index / 8] |= (((1 << j) & data) != 0) << (buffer_index % 8);
+                        cout << ((((1 << j) & data) != 0) ? "1" : "0");
+                        data_buffer[buffer_index / 8] |= (((1  << j) & data) != 0) << (buffer_index % 8);
                         if ((++buffer_index / 8) >= sizeof(data_buffer)) {
                             buffer_to_file(f, data_buffer, sizeof(data_buffer), buffer_index);
                         }
                     }
+                    cout << endl;
                 }
             }
         }
@@ -362,22 +367,59 @@ void DeBrujinGraph<KMERBITS>::save_color_bit_vector(ostream& f,
     if (buffer_index > 0) {
         buffer_to_file(f, data_buffer, divide_and_to_upper(buffer_index, 8));
     }
+    cout << endl;
+}
+
+
+// from a given bitstring generates the appropriate kmer string
+template<uint16_t KMERBITS>
+string DeBrujinGraph<KMERBITS>::kmer_to_str(bitset<KMERBITS> kmer_str) {
+    static const bitset<KMERBITS> mask(string(LOGSIGMA, '1'));
+    stringstream ss;
+    // ss << str.to_string() << endl;
+    for (int i = 0; i < this->km; ++i) {
+        uint8_t ac = (uint8_t) (kmer_str & mask).to_ulong();
+        ss << bits_to_char(ac);
+        kmer_str >>= LOGSIGMA;
+    }
+    return ss.str();
 }
 
 
 template<uint16_t KMERBITS>
 void DeBrujinGraph<KMERBITS>::do_sampling() {
+    static const bitset<KMERBITS> mask(string(kmer_bits, '1'));
     // maximum distance without
     uint32_t max_distance = max(sampling_max_distance, (uint32_t) log2(dbg_kmers.size()));
     cerr << "Starting sampling process with max distance: " << max_distance << "..." << std::endl;
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     for (auto it = dbg_kmers.cbegin(); it != dbg_kmers.cend(); ++it) {
         uint32_t outdeg = outdegree(dbg_kmers[it->first]);
+        uint32_t indeg = indegree(it->first);
         num_of_edges += outdeg;
-        if (!visited[it->first] && ((outdeg > 1))) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
-            // store the colours on each branching node...
-            colors[it->first];
-            explicitly_stored_colors += outdeg;
+
+        if (!visited[it->first]) { // && ((indeg > 1))) { // || indegree(it->first) > 1   || it == dbg_kmers.cbegin()
+            // // store the colours on each branching node...
+            // colors[it->first];
+            // // explicitly_stored_labels += outdeg;
+            // explicitly_stored_labels += indeg;
+
+            {
+                // cout << kmer_to_str(it->first) << endl;
+                bitset<KMERBITS> pkmer = it->first;
+                // uint64_t akmer = pkmer;
+                uint8_t ac = bits_to_id((uint8_t) (pkmer >> (kmer_bits - LOGSIGMA)).to_ulong());
+                pkmer = (pkmer << LOGSIGMA) & mask;
+                for (uint8_t i = 0; i < SIGMA + 1; ++i) {
+                    pkmer ^= symbol_to_bits(base[i]);
+                    // if (dbg_kmers.contains(pkmer) && nodes_outgoing[dbg_kmers.rank(pkmer)][ac]) {
+                    if (dbg_kmers.find(pkmer) != dbg_kmers.end() && (dbg_kmers[pkmer] & (1 << ac)) != 0) {
+                        colors[pkmer];
+                        explicitly_stored_labels++;
+                    }
+                    pkmer ^= symbol_to_bits(base[i]);
+                }
+            }
 
             // if we do sampling (0 means that we only store colour information in branching nodes...)
             if (sampling_max_distance > 0) {
@@ -401,7 +443,7 @@ void DeBrujinGraph<KMERBITS>::do_sampling() {
                                     // store extra colour information (sampling)
                                     if (path_length % max_distance == 0) {
                                         colors[akmer];
-                                        explicitly_stored_colors++;
+                                        explicitly_stored_labels++;
                                     }
                                     break;
                                 }
