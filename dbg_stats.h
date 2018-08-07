@@ -12,10 +12,14 @@ public:
     void do_stats();
 
 private:
+    string kmer_to_str(bitset<KMERBITS> kmer_str);
 
-    void print_node(const bitset<KMERBITS> &str, uint64_t icnt, uint64_t ocnt);
+    void print_node(const bitset<KMERBITS>& str, uint64_t icnt, uint64_t ocnt);
 
-    Roaring get_color(const bitset<KMERBITS> &pkmer);
+    void get_color(const bitset<KMERBITS>& pkmer);
+
+    tuple<size_t, size_t, size_t>
+    traverse(bitset<KMERBITS> pkmer, bool path, sparse_hash_map<bitset<KMERBITS>, uint8_t>& visited);
 };
 
 #endif //SCDBG_DBG_STATS_H

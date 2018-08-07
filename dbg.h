@@ -25,6 +25,8 @@ public:
     DeBrujinGraph(const uint8_t pkm, const uint32_t pc, const uint32_t psmd = 0) : km(pkm), kmer_bits(LOGSIGMA * pkm),
                                                                                    sampling_max_distance(psmd),
                                                                                    num_of_colors(pc) {
+        // kmer_bits = (uint16_t)LOGSIGMA * pkm;
+
         for (uint8_t i = 0; i < SIGMA + 1; ++i) {
             bitset<KMERBITS> sid = symbol_to_bits(base[i]);
             sid <<= kmer_bits - LOGSIGMA;
@@ -35,8 +37,6 @@ public:
     void process_read(const string& dna_str, const uint32_t color_id, bool phase_first);
 
     void gen_succinct_dbg(const string& fname);
-
-    string kmer_to_str(bitset<KMERBITS> kmer_str);
 
 private:
     inline void add_new_node(const bitset<KMERBITS>& akmer, bool new_node, uint8_t pc);
@@ -55,27 +55,52 @@ private:
 
     void save_store_vector(ostream& f);
 
-    void save_color_bit_vector(ostream& f, sparse_hash_map<bitset<MAXCOLORS>, pair<size_t, uint8_t>>& color_class_order,
+    void save_color_bit_vector(const string& fname, sparse_hash_map<bitset<MAXCOLORS>, pair<size_t, uint8_t>>& color_class_order,
                                bool boundary);
 
 protected:
-
-    void sort_dbg();
 
     inline uint8_t outdegree(const bitset<SIGMA + 1>& ar);
 
     inline uint8_t indegree(bitset<KMERBITS> pkmer);
 
+    // inline bitset<MAXCOLORS> color_to_bitset(const Roaring& rc);
+
     inline void add_color(size_t& kmer_color_hash, const uint32_t color_id);
 
     inline size_t add_color_class(const bitset<MAXCOLORS>& bitvector);
+
+    void sort_dbg();
+
+    struct compare_bit_vector : public std::less<pair<bitset<KMERBITS>, uint8_t>> {
+        const pair<bitset<KMERBITS>, uint8_t> bs;
+
+        const pair<bitset<KMERBITS>, uint8_t> mask = pair<bitset<KMERBITS>, uint8_t>(bitset<KMERBITS>(string(LOGSIGMA, '1')), 255);
+
+        int kmer_bits;
+
+        compare_bit_vector(int pkmer_bits) : kmer_bits(pkmer_bits) { }
+
+        bool operator()(const pair<bitset<KMERBITS>, uint8_t>& a, const pair<bitset<KMERBITS>, uint8_t>& b) const {
+            for (int i = kmer_bits - 1; i >= 0; --i) {
+                if (a.first[i] ^ b.first[i]) {
+                    return b.first[i];
+                }
+            }
+            return false;
+        }
+
+        pair<bitset<KMERBITS>, uint8_t> min_value() const { return bs; }
+
+        pair<bitset<KMERBITS>, uint8_t> max_value() const { return mask; }
+    };
 
     array<bitset<KMERBITS>, SIGMA + 1> shifted_sids;
 
     uint8_t km;
     uint32_t kmer_bits;
     uint32_t sampling_max_distance;
-    size_t explicitly_stored_labels = 0;
+    size_t explicitly_stored_colors = 0;
 
     sparse_hash_map<bitset<KMERBITS>, uint8_t> dbg_kmers;
 
@@ -106,6 +131,17 @@ protected:
     // vector<pair<bitset<KMERBITS>, uint8_t>> dbg_kmers_sorted;
 
 };
+
+
+constexpr uint8_t calc_edge_cnt(const uint8_t edge) {
+    uint8_t s = 0;
+    for (uint8_t i = 0; i < SIGMA + 1; ++i) {
+        if (((1 << i) & edge) != 0) {
+            ++s;
+        }
+    }
+    return s;
+}
 
 
 #endif //STATISTICS_DBG_H
