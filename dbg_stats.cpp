@@ -265,6 +265,7 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
             uniform_int_distribution<> uniform_dist2(0, indegree - 1);
             uint8_t j = rand() % indegree; // uniform_dist2(engine);
 
+
             // cout << "first :" << this->kmer_to_str(kmer) << endl;
 
             uint8_t ac = bits_to_id((uint8_t) (kmer >> (this->kmer_bits - LOGSIGMA)).to_ulong());
@@ -319,39 +320,41 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
 
             if (i % 1000 == 0) {
                 cerr << i << " ";
+
+                cout << "maximal tree size:\t\t" << maxtree_size << " " << trees[maxtree_size] << endl;
+                size_t ps = 0;
+                size_t os = 0;
+                for (auto it = trees.cbegin(); it != trees.cend(); ++it) {
+                    ps += it->first * it->second;
+                    os += it->second;
+                }
+                cout << "average tree size:\t\t" << (double) ps / os << endl;
+
+
+                cout << "maximal leaf cnt:\t\t" << maxleaves_cnt << " " << leaves_avg[maxleaves_cnt] << endl;
+                ps = 0;
+                os = 0;
+                for (auto it = leaves_avg.cbegin(); it != leaves_avg.cend(); ++it) {
+                    ps += it->first * it->second;
+                    os += it->second;
+                }
+                cout << "average leaf cnt:\t\t" << (double) ps / os << endl;
+
+
+                cout << "maximal path size:\t\t" << maxpath_length << " " << paths[maxpath_length] << endl;
+                ps = 0;
+                os = 0;
+                for (auto it = paths.cbegin(); it != paths.cend(); ++it) {
+                    ps += it->first * it->second;
+                    os += it->second;
+                }
+                cout << "average path size:\t\t" << (double) ps / os << endl;
             }
         }
         cerr << endl;
 
 
-        cout << "maximal tree size:\t\t" << maxtree_size << " " << trees[maxtree_size] << endl;
-        size_t ps = 0;
-        size_t os = 0;
-        for (auto it = trees.cbegin(); it != trees.cend(); ++it) {
-            ps += it->first * it->second;
-            os += it->second;
-        }
-        cout << "average tree size:\t\t" << (double) ps / os << endl;
 
-
-        cout << "maximal leaf cnt:\t\t" << maxleaves_cnt << " " << leaves_avg[maxleaves_cnt] << endl;
-        ps = 0;
-        os = 0;
-        for (auto it = leaves_avg.cbegin(); it != leaves_avg.cend(); ++it) {
-            ps += it->first * it->second;
-            os += it->second;
-        }
-        cout << "average leaf cnt:\t\t" << (double) ps / os << endl;
-
-
-        cout << "maximal path size:\t\t" << maxpath_length << " " << paths[maxpath_length] << endl;
-        ps = 0;
-        os = 0;
-        for (auto it = paths.cbegin(); it != paths.cend(); ++it) {
-            ps += it->first * it->second;
-            os += it->second;
-        }
-        cout << "average path size:\t\t" << (double) ps / os << endl;
     }
 
     // cout << endl;
@@ -372,10 +375,10 @@ tuple<size_t, size_t, size_t> DeBrujinGraphStats<KMERBITS>::traverse(bitset<KMER
     size_t leaves = 0;
     size_t path_cnt = 0;
 
+    visited[akmer];
     // cout << this->kmer_to_str(akmer) << " " << (int) this->indegree(akmer) << " " << (this->colors.find(akmer) == this->colors.end()) << endl;
     while (this->dbg_kmers.find(akmer) != this->dbg_kmers.end() && this->indegree(akmer) == 1
            && this->colors.find(akmer) == this->colors.end()) { //&& this->outdegree(akmer) == 1) {
-        visited[akmer];
 
         uint8_t ac = bits_to_id((uint8_t) (akmer >> (this->kmer_bits - LOGSIGMA)).to_ulong());
         akmer = (akmer << LOGSIGMA) & mask;
@@ -391,15 +394,21 @@ tuple<size_t, size_t, size_t> DeBrujinGraphStats<KMERBITS>::traverse(bitset<KMER
             }
             akmer ^= symbol_to_bits(base[j]);
         }
+
+        if (visited.find(akmer) != visited.end()) {
+            break;
+        }
+
+        visited[akmer];
     }
     path_cnt = size;
     if (path) {
         return tuple<size_t, size_t, size_t>(size, 1, path_cnt);
     }
     else {
+        visited[akmer];
         if (this->dbg_kmers.find(akmer) != this->dbg_kmers.end() && this->indegree(akmer) > 1 &&
-            this->colors.find(akmer) == this->colors.end() && visited.find(akmer) == visited.end()) {
-            visited[akmer];
+            this->colors.find(akmer) == this->colors.end()) { // visited.find(akmer) == visited.end()
 
             uint8_t ac = bits_to_id((uint8_t) (akmer >> (this->kmer_bits - LOGSIGMA)).to_ulong());
             akmer = (akmer << LOGSIGMA) & mask;
@@ -415,10 +424,10 @@ tuple<size_t, size_t, size_t> DeBrujinGraphStats<KMERBITS>::traverse(bitset<KMER
                 akmer ^= symbol_to_bits(base[j]);
             }
         }
-        else if (visited.find(akmer) == visited.end() && this->colors.find(akmer) != this->colors.end()) {
+        else if (this->colors.find(akmer) != this->colors.end()) {
             leaves++;
         }
-        visited[akmer];
+
         return tuple<size_t, size_t, size_t>(size, leaves, path_cnt);
     }
 }
