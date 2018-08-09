@@ -16,10 +16,10 @@ private:
 
     void print_node(const bitset<KMERBITS>& str, uint64_t icnt, uint64_t ocnt);
 
-    void get_color(const bitset<KMERBITS>& pkmer);
-
     tuple<size_t, size_t, size_t>
     traverse(bitset<KMERBITS> pkmer, bool path, sparse_hash_map<bitset<KMERBITS>, uint8_t>& visited);
+
+    tuple<size_t, size_t, size_t> traverse2(const bitset<KMERBITS>& pkmer, bool path);
 };
 
 #endif //SCDBG_DBG_STATS_H
