@@ -312,7 +312,7 @@ void DeBrujinGraphStats<KMERBITS>::do_stats() {
                         size_t tree_size = get<0>(p2);
                         size_t leaf_cnt = get<1>(p2);
                         size_t path_size = get<2>(p2);
-                        cout << this->kmer_to_str(kmer) << " " << tree_size << " " << leaf_cnt << " " << path_size << endl;
+                        // cout << this->kmer_to_str(kmer) << " " << tree_size << " " << leaf_cnt << " " << path_size << endl;
                         if (trees.find(tree_size) != trees.end()) {
                             trees[tree_size]++;
                         }
@@ -519,7 +519,7 @@ tuple<size_t, size_t, size_t> DeBrujinGraphStats<KMERBITS>::traverse2(const bits
     sparse_hash_map<bitset<KMERBITS>, uint8_t> visited;
     while (!kmer_queue.empty()) {
         auto akmer = kmer_queue.front();
-        cout << kmer_to_str(akmer) << endl;
+        // cout << kmer_to_str(akmer) << endl;
         kmer_queue.pop_front();
         std::vector<bitset<KMERBITS>> incoming_nodes;
         // step backwards until we find the color information or hit a branching node
